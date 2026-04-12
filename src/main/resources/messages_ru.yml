@@ -1,0 +1,171 @@
+ui:
+  title: "&bSkyRandom"
+
+menu:
+  back_name: "&eНазад"
+  back_lore:
+    - "&7Нажми, чтобы вернуться"
+    - "&7в предыдущее меню."
+
+state:
+  waiting: "Ожидание"
+  countdown: "Отсчёт"
+  running: "Идёт матч"
+  ending: "Завершение"
+
+command:
+  arenas_not_loaded: "Арены не загружены."
+  available_arenas: "Доступные арены:"
+  only_players: "Эту команду может использовать только игрок."
+  no_permission: "Нет прав."
+  usage_start: "Использование: /{label} start <arena>"
+  usage_rebuild: "Использование: /{label} rebuildarena <arena>"
+  reloaded: "Конфиг, языки и арены перезагружены."
+  help_header: "Команды:"
+  help_list: " /{label} list &7- список арен"
+  help_join: " /{label} join [arena|random] &7- войти в арену"
+  help_leave: " /{label} leave &7- выйти с арены"
+  help_start: " /{label} start <arena> &7- форс-старт (admin)"
+  help_reload: " /{label} reload &7- перезагрузка конфига (admin)"
+  help_rebuild: " /{label} rebuildarena [arena] &7- заново пересобрать демо-арену (admin)"
+  arena_entry: " - {display} &7({id}) &f{state} &7[{current}/{max}]"
+
+system:
+  match_stopped: "Матч остановлен."
+
+manager:
+  already_in_arena: "Ты уже находишься на арене &f{arena}&7."
+  no_random_arena: "Сейчас нет свободных арен для случайного выбора."
+  arena_not_found: "Арена &f{arena}&7 не найдена."
+  not_in_arena: "Ты сейчас не на арене."
+  rebuild_demo_only: "Команда rebuildarena работает только для демо-арены в &f{world}&7."
+  unsafe_demo_build_blocked: "Пересборка демо-мира для &f{world}&7 заблокирована. Используй отдельный мир с префиксом &f{prefix}&7 или включи unsafe override в конфиге."
+  demo_rebuilt: "Демо-арена &f{arena}&7 пересобрана заново."
+
+reason:
+  command_leave: "вышел по команде"
+  server_leave: "вышел с сервера"
+  spectator_leave: "вышел из режима спектатора"
+  left_arena: "покинул границы арены"
+  fell_down: "сорвался вниз"
+  death_void: "упал в пустоту"
+  death_fall: "разбился"
+  death_burn: "сгорел"
+  death_fatal: "получил фатальный удар"
+
+spectator:
+  exit_name: "&cВыйти из режима спектатора"
+  exit_lore:
+    - "&7Нажми, чтобы выйти с арены"
+    - "&7и вернуться в лобби."
+  info: "Теперь ты в режиме спектатора. Предмет в слоте &f9 &7вернёт тебя в лобби."
+
+profile:
+  selector_name: "&bМеню SkyRandom"
+  selector_lore:
+    - "&7Нажми, чтобы открыть меню"
+    - "&7со статистикой и языком."
+  menu_title: "&bМеню SkyRandom"
+  stats_name: "&bТвоя статистика"
+  stats_lore:
+    - "&7Нажми, чтобы посмотреть"
+    - "&7свои матчи, победы и киллы."
+  about_name: "&bО SkyRandom"
+  about_lore:
+    - "&7Нажми, чтобы посмотреть"
+    - "&7автора и версию плагина."
+  language_name: "&bВыбор языка"
+  language_lore:
+    - "&7Нажми, чтобы открыть меню"
+    - "&7и поменять язык интерфейса."
+  stats_menu_title: "&bТвоя статистика"
+  about_menu_title: "&bО SkyRandom"
+  stats_view_name: "&bСтатистика: &f{player}"
+  stats_matches: "&7Матчей: &f{value}"
+  stats_wins: "&7Побед: &f{value}"
+  stats_kills: "&7Убийств: &f{value}"
+  stats_deaths: "&7Смертей: &f{value}"
+  stats_kd: "&7K/D: &f{value}"
+  stats_winrate: "&7Винрейт: {value}"
+  stats_avg_round_duration: "&7Средняя длительность раунда: &f{value}"
+  about_view_name: "&bО SkyRandom"
+  about_view_lore:
+    - "&7Автор: &f{author}"
+    - "&7Версия: &f{version}"
+    - "&7Билд: &f{build_number}"
+    - "&7Собрано: &f{build_date}"
+    - "&7Хаотичная раундовая мини-игра"
+    - "&7с небесными островами для Paper."
+
+language:
+  selector_name: "&bВыбор языка"
+  selector_lore:
+    - "&7Нажми, чтобы открыть меню"
+    - "&7и поменять язык интерфейса."
+  menu_title: "&bВыбор языка"
+  selected: "&aВыбран"
+  click_to_select: "&eНажми, чтобы выбрать"
+  option_ru: "&fРусский"
+  option_en: "&fEnglish"
+  changed: "Язык изменён на &f{language}&7."
+
+arena:
+  already_here: "Ты уже на этой арене."
+  full: "Арена заполнена."
+  queued_next_round: "Матч уже идёт. Ты в очереди на следующий раунд."
+  player_joined_queue: "&f{player} &7вошёл в очередь на следующий раунд &f{arena} &7[{current}/{max}]"
+  player_joined: "&f{player} &7вошёл на арену &f{arena} &7[{current}/{max}]"
+  player_eliminated_reason: "&f{player} &7выбыл: &f{reason}"
+  player_left_spectator: "&f{player} &7вышел из режима спектатора."
+  player_left_queue: "&f{player} &7покинул очередь."
+  eliminated_by: "Тебя выбил &f{killer}&7."
+  killer_broadcast: "&f{killer} &7выбил &f{player}"
+  eliminated_reason: "Ты выбыл: &f{reason}"
+  force_start_not_enough: "Недостаточно игроков для старта на арене &f{arena}&7."
+  force_start: "Форс-старт арены &f{arena}&7."
+  random_queue_map: "Случайная очередь выбрала новую карту: &f{arena}"
+  random_map_changed: "&bСлучайная карта сменилась на &f{arena}&b."
+  place_match_only: "Блоки можно ставить только во время матча."
+  place_outside: "За пределами арены строить нельзя."
+  place_disabled: "На этой арене запрещено ставить блоки."
+  build_height_limit: "Ты упёрся в лимит высоты: &fY {y}"
+  break_map_forbidden: "Ломать блоки карты нельзя."
+  break_only_own: "Можно ломать только свои поставленные блоки."
+  autostart_started: "Автостарт начался. Нужно продержаться &f{seconds} &7сек."
+  countdown_title: "Старт через {seconds}"
+  countdown_subtitle_freeze: "Не двигайся 2 сек."
+  countdown_broadcast: "Старт через &f{seconds}&7..."
+  autostart_cancelled: "Автостарт отменён: недостаточно игроков."
+  start_not_enough: "Недостаточно игроков для старта."
+  match_cancelled_left: "Матч отменён: часть игроков вышла."
+  round_title: "Раунд: {current}/{max}"
+  match_started: "&aМатч начался. &fРаунд {current}/{max}&a. Сбрось остальных вниз."
+  no_winner: "Матч завершился без победителя."
+  match_finished: "&fМатч завершён"
+  winner: "&aПобедитель: &f{player}"
+  victory_title: "Победа!"
+  next_round_in: "Следующий раунд через &f{seconds}&7..."
+  cleanup_after: "&bПоле очищено после &f{rounds} &bраундов."
+
+bossbar:
+  waiting: "&eОжидание игроков: &f{current}/{required}"
+  countdown: "&fИгра начнется через: &a{seconds} сек"
+  drop: "&fДо выдачи предмета: &a{seconds} сек"
+  next_round: "&fСледующий раунд через: &d{seconds} сек"
+  match_finished: "&fМатч завершён"
+  winner: "&aПобедитель: &f{player}"
+
+sidebar:
+  round: "Раунд: "
+  alive: "Живых: "
+  drop: "До дропа: "
+  cleanup: "До очистки: "
+  none: "--"
+  seconds_suffix: "с"
+
+drop:
+  item: "Тебе выпал предмет: &f{item} &7x{amount}"
+  random_block: "Тебе выпал случайный блок: &f{item} &7x{amount}"
+  effect: "На тебя наложен эффект: &f{effect} &7({seconds}s, lvl {level})"
+  spawn_egg: "Тебе выпало яйцо призыва: &f{mob} &7x{amount}"
+  mob_spawned: "Рядом с тобой появился моб: &f{mob} &7x{amount}"

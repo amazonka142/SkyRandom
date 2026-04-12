@@ -1,0 +1,15 @@
+name: SkyRandom
+version: ${version}
+main: dev.macuser.skyrandom.SkyRandomPlugin
+api-version: '1.21.11'
+author: amazonka142 (vkkooz)
+description: Round-based sky-islands mini-game with random arenas, auto loot drops, spectator mode, and arena rebuilds.
+commands:
+  skyrandom:
+    description: Main command for the SkyRandom mini-game.
+    usage: /skyrandom <join [arena|random]|leave|list|start|reload|rebuildarena>
+    aliases: [sr]
+permissions:
+  skyrandom.admin:
+    description: Allows reloading arenas, rebuilding demo maps, and force-starting matches.
+    default: op

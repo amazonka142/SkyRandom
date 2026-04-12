@@ -1,0 +1,171 @@
+ui:
+  title: "&bSkyRandom"
+
+menu:
+  back_name: "&eBack"
+  back_lore:
+    - "&7Click to return"
+    - "&7to the previous menu."
+
+state:
+  waiting: "Waiting"
+  countdown: "Countdown"
+  running: "Running"
+  ending: "Ending"
+
+command:
+  arenas_not_loaded: "No arenas are loaded."
+  available_arenas: "Available arenas:"
+  only_players: "Only players can use this command."
+  no_permission: "You do not have permission."
+  usage_start: "Usage: /{label} start <arena>"
+  usage_rebuild: "Usage: /{label} rebuildarena <arena>"
+  reloaded: "Config, languages, and arenas were reloaded."
+  help_header: "Commands:"
+  help_list: " /{label} list &7- list arenas"
+  help_join: " /{label} join [arena|random] &7- join an arena"
+  help_leave: " /{label} leave &7- leave the arena"
+  help_start: " /{label} start <arena> &7- force start (admin)"
+  help_reload: " /{label} reload &7- reload config (admin)"
+  help_rebuild: " /{label} rebuildarena [arena] &7- rebuild demo arena (admin)"
+  arena_entry: " - {display} &7({id}) &f{state} &7[{current}/{max}]"
+
+system:
+  match_stopped: "Match stopped."
+
+manager:
+  already_in_arena: "You are already in arena &f{arena}&7."
+  no_random_arena: "There are no free arenas for random selection right now."
+  arena_not_found: "Arena &f{arena}&7 was not found."
+  not_in_arena: "You are not in an arena right now."
+  rebuild_demo_only: "The rebuildarena command only works for the demo arena in &f{world}&7."
+  unsafe_demo_build_blocked: "Blocked demo-world rebuild for &f{world}&7. Use a dedicated world name starting with &f{prefix}&7 or enable the unsafe override in config."
+  demo_rebuilt: "Demo arena &f{arena}&7 was rebuilt."
+
+reason:
+  command_leave: "left via command"
+  server_leave: "left the server"
+  spectator_leave: "left spectator mode"
+  left_arena: "left the arena bounds"
+  fell_down: "fell off"
+  death_void: "fell into the void"
+  death_fall: "hit the ground too hard"
+  death_burn: "burned"
+  death_fatal: "took a fatal hit"
+
+spectator:
+  exit_name: "&cLeave spectator mode"
+  exit_lore:
+    - "&7Click to leave the arena"
+    - "&7and return to the lobby."
+  info: "You are now a spectator. The item in slot &f9 &7will return you to the lobby."
+
+profile:
+  selector_name: "&bSkyRandom Menu"
+  selector_lore:
+    - "&7Click to open the menu"
+    - "&7with stats and language settings."
+  menu_title: "&bSkyRandom Menu"
+  stats_name: "&bYour stats"
+  stats_lore:
+    - "&7Click to view your"
+    - "&7matches, wins, and kills."
+  about_name: "&bAbout SkyRandom"
+  about_lore:
+    - "&7Click to view plugin info,"
+    - "&7author, and version."
+  language_name: "&bLanguage selector"
+  language_lore:
+    - "&7Click to open the menu"
+    - "&7and change your interface language."
+  stats_menu_title: "&bYour stats"
+  about_menu_title: "&bAbout SkyRandom"
+  stats_view_name: "&bStats: &f{player}"
+  stats_matches: "&7Matches: &f{value}"
+  stats_wins: "&7Wins: &f{value}"
+  stats_kills: "&7Kills: &f{value}"
+  stats_deaths: "&7Deaths: &f{value}"
+  stats_kd: "&7K/D: &f{value}"
+  stats_winrate: "&7Win rate: {value}"
+  stats_avg_round_duration: "&7Average round duration: &f{value}"
+  about_view_name: "&bAbout SkyRandom"
+  about_view_lore:
+    - "&7Author: &f{author}"
+    - "&7Version: &f{version}"
+    - "&7Build: &f{build_number}"
+    - "&7Built: &f{build_date}"
+    - "&7Chaotic round-based sky"
+    - "&7islands mini-game for Paper."
+
+language:
+  selector_name: "&bLanguage selector"
+  selector_lore:
+    - "&7Click to open the menu"
+    - "&7and change your interface language."
+  menu_title: "&bChoose language"
+  selected: "&aSelected"
+  click_to_select: "&eClick to select"
+  option_ru: "&fRussian"
+  option_en: "&fEnglish"
+  changed: "Language changed to &f{language}&7."
+
+arena:
+  already_here: "You are already in this arena."
+  full: "The arena is full."
+  queued_next_round: "The match is already running. You are queued for the next round."
+  player_joined_queue: "&f{player} &7joined the queue for the next round on &f{arena} &7[{current}/{max}]"
+  player_joined: "&f{player} &7joined arena &f{arena} &7[{current}/{max}]"
+  player_eliminated_reason: "&f{player} &7was eliminated: &f{reason}"
+  player_left_spectator: "&f{player} &7left spectator mode."
+  player_left_queue: "&f{player} &7left the queue."
+  eliminated_by: "&f{killer} &7eliminated you."
+  killer_broadcast: "&f{killer} &7eliminated &f{player}"
+  eliminated_reason: "You were eliminated: &f{reason}"
+  force_start_not_enough: "Not enough players to start arena &f{arena}&7."
+  force_start: "Force-started arena &f{arena}&7."
+  random_queue_map: "Random queue selected a new map: &f{arena}"
+  random_map_changed: "&bThe random map changed to &f{arena}&b."
+  place_match_only: "You can place blocks only during a match."
+  place_outside: "You cannot build outside the arena."
+  place_disabled: "Block placement is disabled on this arena."
+  build_height_limit: "You reached the build height limit: &fY {y}"
+  break_map_forbidden: "You cannot break arena blocks."
+  break_only_own: "You can only break blocks that you placed."
+  autostart_started: "Auto-start began. Survive for &f{seconds} &7sec."
+  countdown_title: "Starts in {seconds}"
+  countdown_subtitle_freeze: "Do not move for 2 seconds."
+  countdown_broadcast: "Starting in &f{seconds}&7..."
+  autostart_cancelled: "Auto-start cancelled: not enough players."
+  start_not_enough: "Not enough players to start."
+  match_cancelled_left: "Match cancelled: some players left."
+  round_title: "Round: {current}/{max}"
+  match_started: "&aMatch started. &fRound {current}/{max}&a. Knock everyone else down."
+  no_winner: "The match ended without a winner."
+  match_finished: "&fMatch finished"
+  winner: "&aWinner: &f{player}"
+  victory_title: "Victory!"
+  next_round_in: "Next round in &f{seconds}&7..."
+  cleanup_after: "&bThe field was cleared after &f{rounds} &brounds."
+
+bossbar:
+  waiting: "&eWaiting for players: &f{current}/{required}"
+  countdown: "&fGame starts in: &a{seconds} sec"
+  drop: "&fNext item drop in: &a{seconds} sec"
+  next_round: "&fNext round in: &d{seconds} sec"
+  match_finished: "&fMatch finished"
+  winner: "&aWinner: &f{player}"
+
+sidebar:
+  round: "Round: "
+  alive: "Alive: "
+  drop: "Next drop: "
+  cleanup: "Cleanup in: "
+  none: "--"
+  seconds_suffix: "s"
+
+drop:
+  item: "You received: &f{item} &7x{amount}"
+  random_block: "You received a random block: &f{item} &7x{amount}"
+  effect: "You got the effect: &f{effect} &7({seconds}s, lvl {level})"
+  spawn_egg: "You received a spawn egg: &f{mob} &7x{amount}"
+  mob_spawned: "A mob appeared near you: &f{mob} &7x{amount}"

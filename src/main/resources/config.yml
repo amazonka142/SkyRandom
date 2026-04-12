@@ -1,0 +1,803 @@
+config-version: 4
+
+settings:
+  prefix: "&b[SkyRandom] &7"
+  dedicated-server-mode: true
+  solo-test-mode: false
+  restore-player-state-on-leave: false
+  teleport-to-lobby-on-join: true
+  auto-queue-on-join: true
+  default-arena: random
+  auto-create-void-world: true
+  auto-build-default-map: true
+  allow-unsafe-demo-build-world-override: false
+  void-world-name: skyrandom_void
+  lobby-protection-radius: 12
+  lobby-protection-below: 14
+  lobby-protection-above: 6
+  arena-border-warning-distance: 4
+  player-boundary-margin: 12.0
+  player-max-y-margin: 64.0
+  drop-interval-ticks: 100
+  countdown-seconds: 12
+  win-delay-seconds: 0
+  reset-win-delay-seconds: 20
+  rounds-before-reset: 10
+  round-start-freeze-ticks: 40
+  eliminate-below-y: 58
+  max-build-y: 96
+  drop-height-offset: 6.0
+  allow-place-blocks: true
+  allow-break-map-blocks: false
+  only-break-own-placed-blocks: false
+
+lobby:
+  world: skyrandom_void
+  x: 0.5
+  y: 97.0
+  z: 0.5
+  yaw: 180.0
+  pitch: 0.0
+
+loot-table:
+  common_blocks:
+    chance: 35
+    entries:
+      - type: item
+        weight: 2
+        material: COBBLESTONE
+        amount: 10-18
+      - type: item
+        weight: 2
+        material: DIRT
+        amount: 10-20
+      - type: item
+        weight: 2
+        material: STONE
+        amount: 8-16
+      - type: item
+        weight: 2
+        material: OAK_PLANKS
+        amount: 8-16
+      - type: item
+        weight: 1
+        material: ANDESITE
+        amount: 8-14
+      - type: item
+        weight: 1
+        material: DIORITE
+        amount: 8-14
+      - type: item
+        weight: 1
+        material: GRANITE
+        amount: 8-14
+      - type: item
+        weight: 1
+        material: DEEPSLATE
+        amount: 8-14
+      - type: item
+        weight: 1
+        material: TUFF
+        amount: 8-14
+      - type: item
+        weight: 1
+        material: GLASS
+        amount: 4-10
+      - type: item
+        weight: 1
+        material: GLASS_PANE
+        amount: 8-16
+      - type: item
+        weight: 1
+        material: SANDSTONE
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: BRICKS
+        amount: 6-10
+      - type: item
+        weight: 1
+        material: MOSS_BLOCK
+        amount: 5-10
+      - type: item
+        weight: 1
+        material: HAY_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: SCAFFOLDING
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: LADDER
+        amount: 10-20
+      - type: item
+        weight: 1
+        material: OAK_STAIRS
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: COBBLESTONE_STAIRS
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: OAK_SLAB
+        amount: 8-16
+      - type: item
+        weight: 1
+        material: COBBLESTONE_SLAB
+        amount: 8-16
+      - type: item
+        weight: 1
+        material: SLIME_BLOCK
+        amount: 2-4
+      - type: item
+        weight: 1
+        material: HONEY_BLOCK
+        amount: 2-4
+      - type: item
+        weight: 1
+        material: TARGET
+        amount: 2-4
+      - type: item
+        weight: 1
+        material: TINTED_GLASS
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: SEA_LANTERN
+        amount: 2-5
+      - type: item
+        weight: 1
+        material: AMETHYST_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: PACKED_MUD
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: MUD_BRICKS
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: DRIPSTONE_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: CALCITE
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: TUFF_BRICKS
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: OBSIDIAN
+        amount: 2-5
+      - type: item
+        weight: 1
+        material: DRIED_KELP_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: BONE_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: RED_MUSHROOM_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: BROWN_MUSHROOM_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: NETHER_WART_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: WARPED_WART_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: END_STONE_BRICKS
+        amount: 5-10
+      - type: item
+        weight: 1
+        material: PURPUR_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: PRISMARINE_BRICKS
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: CHERRY_PLANKS
+        amount: 8-16
+      - type: item
+        weight: 1
+        material: BAMBOO_BLOCK
+        amount: 4-8
+      - type: item
+        weight: 1
+        material: BLUE_ICE
+        amount: 2-4
+      - type: item
+        weight: 1
+        material: SPONGE
+        amount: 2-4
+      - type: item
+        weight: 1
+        material: MAGMA_BLOCK
+        amount: 3-6
+      - type: item
+        weight: 1
+        material: CACTUS
+        amount: 3-6
+      - type: item
+        weight: 1
+        material: WHITE_WOOL
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: MOSSY_COBBLESTONE
+        amount: 6-12
+      - type: item
+        weight: 1
+        material: BRICKS
+        amount: 8-14
+
+  wild_blocks:
+    chance: 16
+    entries:
+      - type: random_block
+        weight: 1
+        amount: 6-16
+
+  junk_and_utility:
+    chance: 12
+    entries:
+      - type: item
+        weight: 2
+        material: CRAFTING_TABLE
+        amount: 1
+      - type: item
+        weight: 2
+        material: FURNACE
+        amount: 1
+      - type: item
+        weight: 1
+        material: BLAST_FURNACE
+        amount: 1
+      - type: item
+        weight: 1
+        material: SMOKER
+        amount: 1
+      - type: item
+        weight: 2
+        material: COAL
+        amount: 4-16
+      - type: item
+        weight: 1
+        material: CHARCOAL
+        amount: 3-10
+      - type: item
+        weight: 1
+        material: BARREL
+        amount: 1
+      - type: item
+        weight: 1
+        material: CHEST
+        amount: 1
+      - type: item
+        weight: 1
+        material: CAULDRON
+        amount: 1
+      - type: item
+        weight: 1
+        material: COMPOSTER
+        amount: 1
+      - type: item
+        weight: 1
+        material: NOTE_BLOCK
+        amount: 1
+      - type: item
+        weight: 1
+        material: BOOKSHELF
+        amount: 1
+      - type: item
+        weight: 1
+        material: STONECUTTER
+        amount: 1
+      - type: item
+        weight: 1
+        material: GRINDSTONE
+        amount: 1
+      - type: item
+        weight: 1
+        material: LECTERN
+        amount: 1
+
+  danger:
+    chance: 22
+    entries:
+      - type: item
+        weight: 2
+        material: TNT
+        amount: 1-2
+      - type: item
+        weight: 2
+        material: COBWEB
+        amount: 1-3
+      - type: item
+        weight: 1
+        material: SAND
+        amount: 6-10
+      - type: item
+        weight: 1
+        material: GRAVEL
+        amount: 6-10
+      - type: item
+        weight: 1
+        material: LAVA_BUCKET
+        amount: 1
+      - type: item
+        weight: 1
+        material: WATER_BUCKET
+        amount: 1
+      - type: item
+        weight: 1
+        material: ANVIL
+        amount: 1
+      - type: item
+        weight: 1
+        material: CHIPPED_ANVIL
+        amount: 1
+      - type: item
+        weight: 1
+        material: POINTED_DRIPSTONE
+        amount: 3-6
+      - type: item
+        weight: 1
+        material: POWDER_SNOW_BUCKET
+        amount: 1
+      - type: item
+        weight: 1
+        material: WITHER_ROSE
+        amount: 1-2
+      - type: item
+        weight: 1
+        material: FIRE_CHARGE
+        amount: 1-3
+      - type: item
+        weight: 1
+        material: CAMPFIRE
+        amount: 1-2
+      - type: item
+        weight: 1
+        material: SOUL_CAMPFIRE
+        amount: 1-2
+      - type: item
+        weight: 1
+        material: RESPAWN_ANCHOR
+        amount: 1
+
+  mobs:
+    chance: 8
+    entries:
+      - type: mob
+        weight: 2
+        entity: ZOMBIE
+        amount: 1
+      - type: mob
+        weight: 2
+        entity: CREEPER
+        amount: 1
+      - type: mob
+        weight: 1
+        entity: SNIFFER
+        amount: 1
+      - type: mob
+        weight: 1
+        entity: SPIDER
+        amount: 1
+      - type: mob
+        weight: 0.2
+        entity: BREEZE
+        amount: 1
+      - type: mob
+        weight: 1
+        entity: SLIME
+        amount: 1-2
+      - type: mob
+        weight: 1
+        entity: CAVE_SPIDER
+        amount: 1
+      - type: mob
+        weight: 1
+        entity: SILVERFISH
+        amount: 2-4
+      - type: mob
+        weight: 1
+        entity: GOAT
+        amount: 1
+      - type: mob
+        weight: 1
+        entity: CHICKEN
+        amount: 1-2
+
+  chaos:
+    chance: 18
+    entries:
+      - type: effect
+        weight: 3
+        effect: BLINDNESS
+        duration-seconds: 5
+        amplifier: 0
+      - type: effect
+        weight: 2
+        effect: LEVITATION
+        duration-seconds: 4
+        amplifier: 0
+      - type: effect
+        weight: 2
+        effect: JUMP_BOOST
+        duration-seconds: 8
+        amplifier: 2
+      - type: effect
+        weight: 1
+        effect: SLOW_FALLING
+        duration-seconds: 8
+        amplifier: 0
+      - type: effect
+        weight: 1
+        effect: SPEED
+        duration-seconds: 8
+        amplifier: 1
+      - type: effect
+        weight: 1
+        effect: NAUSEA
+        duration-seconds: 6
+        amplifier: 0
+      - type: effect
+        weight: 1
+        effect: DARKNESS
+        duration-seconds: 6
+        amplifier: 0
+      - type: item
+        weight: 2
+        material: STICK
+        amount: 1
+        name: "&dKnockback Stick"
+        enchants:
+          knockback: 2
+      - type: item
+        weight: 2
+        material: ENDER_PEARL
+        amount: 1-2
+      - type: item
+        weight: 1
+        material: FISHING_ROD
+        amount: 1
+      - type: item
+        weight: 1
+        material: FIREWORK_ROCKET
+        amount: 4-8
+
+  gear:
+    chance: 6
+    entries:
+      - type: item
+        weight: 3
+        material: WOODEN_SWORD
+        amount: 1
+      - type: item
+        weight: 3
+        material: STONE_SWORD
+        amount: 1
+        enchants:
+          sharpness: 1
+      - type: item
+        weight: 1
+        material: WOODEN_AXE
+        amount: 1
+      - type: item
+        weight: 3
+        material: STONE_AXE
+        amount: 1
+      - type: item
+        weight: 2
+        material: WOODEN_PICKAXE
+        amount: 1
+      - type: item
+        weight: 2
+        material: STONE_PICKAXE
+        amount: 1
+      - type: item
+        weight: 2
+        material: WOODEN_SHOVEL
+        amount: 1
+      - type: item
+        weight: 2
+        material: STONE_SHOVEL
+        amount: 1
+      - type: item
+        weight: 1
+        material: IRON_SWORD
+        amount: 1
+        enchants:
+          sharpness: 1
+      - type: item
+        weight: 1
+        material: IRON_AXE
+        amount: 1
+      - type: item
+        weight: 1
+        material: IRON_PICKAXE
+        amount: 1
+      - type: item
+        weight: 1
+        material: IRON_SHOVEL
+        amount: 1
+      - type: item
+        weight: 0.35
+        material: DIAMOND_SWORD
+        amount: 1
+        enchants:
+          sharpness: 2
+      - type: item
+        weight: 0.35
+        material: DIAMOND_AXE
+        amount: 1
+      - type: item
+        weight: 0.35
+        material: DIAMOND_PICKAXE
+        amount: 1
+        enchants:
+          efficiency: 2
+      - type: item
+        weight: 0.35
+        material: DIAMOND_SHOVEL
+        amount: 1
+      - type: item
+        weight: 0.8
+        material: CHAINMAIL_HELMET
+        amount: 1
+      - type: item
+        weight: 0.6
+        material: IRON_CHESTPLATE
+        amount: 1
+      - type: item
+        weight: 0.8
+        material: GOLDEN_LEGGINGS
+        amount: 1
+      - type: item
+        weight: 0.25
+        material: DIAMOND_BOOTS
+        amount: 1
+        enchants:
+          feather_falling: 2
+      - type: item
+        weight: 0.8
+        material: SHIELD
+        amount: 1
+      - type: bundle
+        key: archer_kit
+        weight: 1
+        items:
+          - material: BOW
+            amount: 1
+            enchants:
+              power: 1
+          - material: ARROW
+            amount: 10-18
+
+  ultra_rare:
+    chance: 2
+    entries:
+      - type: item
+        weight: 1
+        material: ELYTRA
+        amount: 1
+        name: "&6Ultra Elytra"
+      - type: item
+        weight: 1
+        material: TOTEM_OF_UNDYING
+        amount: 1
+        name: "&6Ultra Totem"
+      - type: item
+        weight: 1
+        material: GOAT_HORN
+        amount: 1
+        name: "&6Ultra Horn"
+      - type: item
+        weight: 1
+        material: WIND_CHARGE
+        amount: 2-4
+        name: "&6Ultra Wind Charge"
+      - type: item
+        weight: 0.35
+        material: NETHERITE_SWORD
+        amount: 1
+        name: "&6Ultra Netherite Sword"
+        enchants:
+          sharpness: 3
+      - type: item
+        weight: 0.35
+        material: NETHERITE_AXE
+        amount: 1
+        name: "&6Ultra Netherite Axe"
+
+arenas:
+  alpha:
+    display-name: "&ePillars"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 58
+    max-build-y: 96
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: -35
+        y: -64
+        z: -35
+      max:
+        x: 35
+        y: 130
+        z: 35
+    spawns:
+      - world: skyrandom_void
+        x: -12.5
+        y: 71.0
+        z: -12.5
+        yaw: 45.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 12.5
+        y: 71.0
+        z: -12.5
+        yaw: 135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 12.5
+        y: 71.0
+        z: 12.5
+        yaw: -135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: -12.5
+        y: 71.0
+        z: 12.5
+        yaw: -45.0
+        pitch: 0.0
+  throne:
+    display-name: "&6Central Throne"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 58
+    max-build-y: 96
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 55
+        y: -64
+        z: -35
+      max:
+        x: 125
+        y: 130
+        z: 35
+    spawns:
+      - world: skyrandom_void
+        x: 90.5
+        y: 71.0
+        z: -18.5
+        yaw: 0.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 108.5
+        y: 71.0
+        z: 0.5
+        yaw: 90.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 90.5
+        y: 71.0
+        z: 18.5
+        yaw: 180.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 72.5
+        y: 71.0
+        z: 0.5
+        yaw: -90.0
+        pitch: 0.0
+  wreckage:
+    display-name: "&cWreckage"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 58
+    max-build-y: 96
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 145
+        y: -64
+        z: -35
+      max:
+        x: 235
+        y: 130
+        z: 35
+    spawns:
+      - world: skyrandom_void
+        x: 167.5
+        y: 71.0
+        z: -18.5
+        yaw: 35.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 213.5
+        y: 71.0
+        z: -18.5
+        yaw: 145.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 213.5
+        y: 71.0
+        z: 18.5
+        yaw: -145.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 167.5
+        y: 71.0
+        z: 18.5
+        yaw: -35.0
+        pitch: 0.0
