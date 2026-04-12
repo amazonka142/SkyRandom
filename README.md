@@ -1,74 +1,35 @@
 # SkyRandom
 
-Мини-игра для Paper `1.21.11` и `26.1.1` с маленькими островами, раундами и хаотичным случайным лутом. Плагин уже поддерживает случайный выбор арен, spectator mode после смерти, звуки старта и победы, а также быструю пересборку демо-карт.
+SkyRandom is a fast-paced Paper mini-game built for small PvP matches on floating pillars.
 
-## Возможности
+Players join a lobby, get sent into a random arena, and fight through multiple rounds while the game drops random loot above them. Drops can include useful blocks, weak and strong tools, strange utility items, potion effects, mobs, and chaotic surprises.
 
-- случайный выбор арены через `/skyrandom join random`
-- раундовый геймплей с отсчётом перед стартом и автоматическими дропами
-- случайный лут: блоки, утилити-предметы, эффекты и другой полезный хаос
-- спавн мобов и mob/spawn egg-дропы через настраиваемую loot table
-- боковое табло с раундом, числом выживших, таймером дропа и сброса карты
-- сообщения о выбываниях и звуки старта/победы
-- spectator mode после смерти: полёт, невидимость и быстрый выход в лобби
-- очистка поставленных блоков и команда `/skyrandom rebuildarena [arena]`
-- лимит высоты постройки, предупреждения у границы и защита блоков карты
-- настройка арен, лобби, выбора карты и лут-таблицы через `config.yml`
+## Latest Version
 
-## Сборка
+`1.0.0-beta.3+11`
 
-```bash
-./gradlew build
-```
+## How Matches Work
 
-Готовый `.jar` появится в:
+- Each match lasts 10 rounds.
+- Throughout all 10 rounds, placed blocks, dropped items, water, and other arena changes remain in place.
+- After the 10th round, the arena is fully cleared, and players are moved to a different arena.
 
-```text
-build/libs/skyrandom-<version>.jar
-```
+## Important
 
-Один и тот же `.jar` собирается против API `1.21.11`, чтобы оставаться совместимым как с `Paper 1.21.11`, так и с `Paper 26.1.1`, если не используются API-методы только из новой ветки.
+SkyRandom is a server plugin, not a mod, so it cannot be used in singleplayer.
 
-Если хочешь отдельно прогнать compile-check против ветки `26.1.1`, можно использовать:
+## Installation
 
-```bash
-./gradlew build -PpaperApiVersion=26.1.1.build.20-alpha -PjavaRelease=25
-```
+To use SkyRandom, you must install it on a Paper server:
 
-Для этого на машине нужен `Java 25`, потому что сам `Paper 26.1.1` сейчас требует его минимум.
+1. Download the `.jar` file.
+2. Place it into your server's `plugins` folder.
+3. Start or restart your server.
 
-## Установка
+## Supported Server Software
 
-1. Скопируй `.jar` в папку `plugins/` сервера Paper.
-2. Запусти сервер.
-3. При первом запуске плагин создаст конфиг и, если включён `auto-build-default-map`, соберёт демо-мир автоматически.
-4. При желании отредактируй `plugins/SkyRandom/config.yml` под свои координаты арен, лобби и баланс лута.
-5. Выполни `/skyrandom reload` или перезапусти сервер.
+- Paper
 
-## Демо-контент по умолчанию
+## Beta Status
 
-- лобби в мире `skyrandom_void`
-- арена `alpha`
-- арена `throne` (`Central Throne`)
-- случайный вход через `random`
-
-## Команды
-
-- `/skyrandom list`
-- `/skyrandom join <arena|random>`
-- `/skyrandom leave`
-- `/skyrandom start <arena>`
-- `/skyrandom reload`
-- `/skyrandom rebuildarena [arena]`
-
-## Для кого это сейчас
-
-Версия формата `1.0.0-beta.3+9` уже подходит для публичного тестирования и небольших серверов. Это не сырой прототип, но баланс и контент ещё можно спокойно дорабатывать после первых отзывов игроков.
-
-## Что можно улучшать дальше
-
-- больше арен и режимов матча
-- статистику побед и простую прогрессию
-- отдельные наборы лута для разных режимов
-- GUI или голосование для ручного выбора карты
-- более тонкую защиту от нестандартных предметов и эксплойтов
+SkyRandom is currently in public beta and is designed for testing, feedback, and small servers.
