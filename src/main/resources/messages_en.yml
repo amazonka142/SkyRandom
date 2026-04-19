@@ -109,6 +109,69 @@ language:
   option_en: "&fEnglish"
   changed: "Language changed to &f{language}&7."
 
+host:
+  selector_name: "&6Game Settings"
+  selector_lore:
+    - "&7Only the lobby host can use this."
+    - "&7Click to open the server"
+    - "&7match settings menu."
+  menu_title: "&6Game Settings"
+  transfer_menu_title: "&6Transfer Host"
+  not_host: "&cYou are no longer the lobby host."
+  assigned: "&aYou are now the lobby host. The item in slot &f5 &awill open game settings."
+  transfer_sent: "&aHost role transferred to &f{player}&a."
+  transfer_received: "&a{player} &agave you the host role."
+  transfer_target_unavailable: "&cThat player is no longer available."
+  status_enabled: "&aEnabled"
+  status_disabled: "&cDisabled"
+  click_toggle: "&eClick to toggle"
+  click_cycle_map: "&eClick to select the next map"
+  sudden_night_name: "&bSudden Night"
+  sudden_night_lore:
+    - "&7Status: {status}"
+    - "&7Controls the night phase"
+    - "&7during matches."
+    - "{action}"
+  sudden_night_changed: "Sudden Night: {status}"
+  rounds_minus_name: "&cRounds Before Reset: -1"
+  rounds_minus_lore:
+    - "&7Current value: &f{value}"
+    - "&eClick to decrease."
+  rounds_info_name: "&bRounds Before Reset"
+  rounds_info_lore:
+    - "&7The map will be cleaned"
+    - "&7after &f{value} &7rounds."
+  rounds_plus_name: "&aRounds Before Reset: +1"
+  rounds_plus_lore:
+    - "&7Current value: &f{value}"
+    - "&eClick to increase."
+  rounds_changed: "Rounds before reset: &f{value}"
+  map_name: "&bMap Selection"
+  map_lore:
+    - "&7Current map: &f{map}"
+    - "{action}"
+  map_random: "&fRandom"
+  map_changed: "Selected map: &f{map}"
+  autostart_name: "&bAutostart"
+  autostart_lore:
+    - "&7Status: {status}"
+    - "&7If disabled, the game will not start"
+    - "&7until the host enables it again."
+    - "{action}"
+  autostart_changed: "Autostart: {status}"
+  transfer_name: "&bTransfer Host Role"
+  transfer_lore:
+    - "&7Open the current player list"
+    - "&7and hand the role to someone else."
+  transfer_target_name: "&fTransfer to: {player}"
+  transfer_target_lore:
+    - "&eClick to transfer"
+    - "&ethe host role to this player."
+  transfer_empty_name: "&cNo players available"
+  transfer_empty_lore:
+    - "&7There are no other players"
+    - "&7online right now."
+
 arena:
   already_here: "You are already in this arena."
   full: "The arena is full."
@@ -140,6 +203,12 @@ arena:
   match_cancelled_left: "Match cancelled: some players left."
   round_title: "Round: {current}/{max}"
   match_started: "&aMatch started. &fRound {current}/{max}&a. Knock everyone else down."
+  sudden_night_started: "&4Sudden Night has begun. &7The arena has fallen into darkness."
+  sudden_night_title: "&4Sudden Night"
+  sudden_night_subtitle: "&7Surviving in the dark just got harder."
+  sudden_night_ended: "&eSudden Night is over. &7Daylight returned to the arena."
+  day_returns_title: "&eDaylight Returns"
+  day_returns_subtitle: "&7Sudden Night has passed."
   no_winner: "The match ended without a winner."
   match_finished: "&fMatch finished"
   winner: "&aWinner: &f{player}"

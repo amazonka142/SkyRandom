@@ -42,7 +42,7 @@ repositories {
 
 dependencies {
     // Compile against the oldest supported Paper API so one jar can run on both
-    // Paper 1.21.11 and newer compatible server versions such as 26.1.1.
+    // Paper 1.21.11 and newer compatible server versions such as 26.1.1 and 26.1.2.
     compileOnly("io.papermc.paper:paper-api:${paperApiVersion.get()}")
 }
 
@@ -75,6 +75,10 @@ tasks.jar {
 }
 
 tasks.processResources {
+    inputs.file(versionPropertiesFile)
+    inputs.property("pluginVersion", project.version.toString())
+    inputs.property("buildNumber", currentBuildNumber)
+    inputs.property("buildDate", buildDate)
     filteringCharset = "UTF-8"
     filesMatching("plugin.yml") {
         expand(

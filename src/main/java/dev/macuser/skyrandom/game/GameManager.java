@@ -3,6 +3,8 @@ package dev.macuser.skyrandom.game;
 import dev.macuser.skyrandom.BuildInfo;
 import dev.macuser.skyrandom.SkyRandomPlugin;
 import dev.macuser.skyrandom.gui.AboutMenuHolder;
+import dev.macuser.skyrandom.gui.HostMenuHolder;
+import dev.macuser.skyrandom.gui.HostTransferMenuHolder;
 import dev.macuser.skyrandom.gui.LanguageMenuHolder;
 import dev.macuser.skyrandom.gui.ProfileMenuHolder;
 import dev.macuser.skyrandom.gui.StatsMenuHolder;
@@ -15,6 +17,7 @@ import dev.macuser.skyrandom.world.VoidChunkGenerator;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -30,6 +34,7 @@ import org.bukkit.GameRules;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldBorder;
@@ -47,12 +52,17 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
 public final class GameManager {
 
     private static final long COMBAT_TAG_MILLIS = 15_000L;
+    private static final long DEFAULT_WORLD_DAY_TIME = 6_000L;
+    private static final long DEFAULT_WORLD_NIGHT_TIME = 18_000L;
+    private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 300;
+    private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
     private static final String DEFAULT_VOID_WORLD_NAME = "skyrandom_void";
     private static final String SAFE_DEMO_WORLD_PREFIX = "skyrandom_";
     private static final String ABOUT_AUTHOR = "amazonka142 (vkkooz)";
@@ -64,6 +74,7 @@ public final class GameManager {
     private final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
     private final Map<UUID, UUID> lastAttackers = new HashMap<>();
     private final Map<UUID, Long> lastAttackTimes = new HashMap<>();
+    private final Map<UUID, SuddenNightWorldState> suddenNightStates = new HashMap<>();
     private final MessageManager messages;
     private final PlayerStatsStore statsStore;
     private final NamespacedKey spectatorExitItemKey;
@@ -73,6 +84,13 @@ public final class GameManager {
     private final NamespacedKey profileLanguageItemKey;
     private final NamespacedKey profileAboutItemKey;
     private final NamespacedKey menuBackItemKey;
+    private final NamespacedKey lobbyHostItemKey;
+    private final NamespacedKey hostMenuToggleSuddenNightItemKey;
+    private final NamespacedKey hostMenuRoundsAdjustItemKey;
+    private final NamespacedKey hostMenuArenaCycleItemKey;
+    private final NamespacedKey hostMenuAutostartItemKey;
+    private final NamespacedKey hostMenuTransferItemKey;
+    private final NamespacedKey hostTransferTargetItemKey;
 
     private DropTable dropTable = DropTable.empty();
     private Location lobbyLocation;
@@ -82,11 +100,20 @@ public final class GameManager {
     private boolean autoQueueOnJoin = true;
     private boolean dedicatedServerMode = true;
     private boolean soloTestMode = true;
-    private String defaultArenaId = "alpha";
+    private boolean suddenNightEnabled = true;
+    private String defaultArenaId = "random";
     private int lobbyProtectionRadius = 12;
     private int lobbyProtectionBelow = 14;
     private int lobbyProtectionAbove = 6;
     private int arenaBorderWarningDistance = 4;
+    private int suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
+    private int suddenNightDurationSeconds = DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
+    private boolean lobbyAutostartEnabled = true;
+    private int lobbyRoundsBeforeReset = 10;
+    private UUID lobbyHostId;
+    private final Map<UUID, Long> lobbyHostJoinOrder = new HashMap<>();
+    private long nextLobbyJoinOrder = 1L;
+    private BukkitTask staticDaylightTask;
 
     public GameManager(SkyRandomPlugin plugin) {
         this.plugin = plugin;
@@ -99,6 +126,13 @@ public final class GameManager {
         this.profileLanguageItemKey = new NamespacedKey(plugin, "profile_language_item");
         this.profileAboutItemKey = new NamespacedKey(plugin, "profile_about_item");
         this.menuBackItemKey = new NamespacedKey(plugin, "menu_back_item");
+        this.lobbyHostItemKey = new NamespacedKey(plugin, "lobby_host_item");
+        this.hostMenuToggleSuddenNightItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night");
+        this.hostMenuRoundsAdjustItemKey = new NamespacedKey(plugin, "host_menu_rounds_adjust");
+        this.hostMenuArenaCycleItemKey = new NamespacedKey(plugin, "host_menu_arena_cycle");
+        this.hostMenuAutostartItemKey = new NamespacedKey(plugin, "host_menu_autostart");
+        this.hostMenuTransferItemKey = new NamespacedKey(plugin, "host_menu_transfer");
+        this.hostTransferTargetItemKey = new NamespacedKey(plugin, "host_transfer_target");
     }
 
     public void reload() {
@@ -112,11 +146,18 @@ public final class GameManager {
         this.autoQueueOnJoin = settings == null || settings.getBoolean("auto-queue-on-join", true);
         this.dedicatedServerMode = settings == null || settings.getBoolean("dedicated-server-mode", true);
         this.soloTestMode = settings == null || settings.getBoolean("solo-test-mode", true);
-        this.defaultArenaId = settings != null ? settings.getString("default-arena", "alpha") : "alpha";
+        this.suddenNightEnabled = settings == null || settings.getBoolean("sudden-night-enabled", true);
+        this.defaultArenaId = settings != null ? settings.getString("default-arena", "random") : "random";
         this.lobbyProtectionRadius = settings != null ? Math.max(1, settings.getInt("lobby-protection-radius", 12)) : 12;
         this.lobbyProtectionBelow = settings != null ? Math.max(0, settings.getInt("lobby-protection-below", 14)) : 14;
         this.lobbyProtectionAbove = settings != null ? Math.max(0, settings.getInt("lobby-protection-above", 6)) : 6;
         this.arenaBorderWarningDistance = settings != null ? Math.max(0, settings.getInt("arena-border-warning-distance", 4)) : 4;
+        this.suddenNightDelaySeconds = settings != null
+            ? Math.max(1, settings.getInt("sudden-night-delay-seconds", DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS))
+            : DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
+        this.suddenNightDurationSeconds = settings != null
+            ? Math.max(1, settings.getInt("sudden-night-duration-seconds", DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS))
+            : DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
         double globalPlayerBoundaryMargin = settings != null ? Math.max(0.0D, settings.getDouble("player-boundary-margin", 12.0D)) : 12.0D;
         double globalPlayerMaxYMargin = settings != null ? Math.max(0.0D, settings.getDouble("player-max-y-margin", 64.0D)) : 64.0D;
         this.messages.reload(settings);
@@ -143,6 +184,8 @@ public final class GameManager {
         boolean globalAllowPlace = settings == null || settings.getBoolean("allow-place-blocks", true);
         boolean globalAllowBreakMap = settings != null && settings.getBoolean("allow-break-map-blocks", false);
         boolean globalOnlyBreakOwn = settings == null || settings.getBoolean("only-break-own-placed-blocks", true);
+        this.lobbyAutostartEnabled = true;
+        this.lobbyRoundsBeforeReset = Math.max(1, globalRoundsBeforeReset);
 
         for (String arenaId : arenasSection.getKeys(false)) {
             ConfigurationSection arenaSection = arenasSection.getConfigurationSection(arenaId);
@@ -207,7 +250,7 @@ public final class GameManager {
                 arenaSection.getBoolean("allow-place-blocks", globalAllowPlace),
                 arenaSection.getBoolean("allow-break-map-blocks", globalAllowBreakMap),
                 arenaSection.getBoolean("only-break-own-placed-blocks", globalOnlyBreakOwn),
-                arenaSection.getInt("rounds-before-reset", globalRoundsBeforeReset),
+                arenaSection.getInt("rounds-before-reset", lobbyRoundsBeforeReset),
                 arenaSection.getInt("round-start-freeze-ticks", globalRoundStartFreezeTicks),
                 arenaSection.getDouble("player-boundary-margin", globalPlayerBoundaryMargin),
                 arenaSection.getDouble("player-max-y-margin", globalPlayerMaxYMargin)
@@ -216,6 +259,10 @@ public final class GameManager {
         }
 
         plugin.getLogger().info("Loaded " + arenas.size() + " arena(s).");
+        if (!suddenNightEnabled) {
+            enforceStaticDaylight();
+        }
+        startStaticDaylightTask();
         restoreOnlinePlayersAfterReload();
     }
 
@@ -223,6 +270,8 @@ public final class GameManager {
         for (Arena arena : arenas.values()) {
             arena.forceStop("system.match_stopped");
         }
+        clearSuddenNightStates();
+        stopStaticDaylightTask();
         arenas.clear();
         playerArenas.clear();
         randomQueuePlayers.clear();
@@ -261,6 +310,18 @@ public final class GameManager {
 
     public boolean isSoloTestMode() {
         return soloTestMode;
+    }
+
+    public boolean isLobbyAutostartEnabled() {
+        return lobbyAutostartEnabled;
+    }
+
+    public int getLobbyRoundsBeforeReset() {
+        return lobbyRoundsBeforeReset;
+    }
+
+    public boolean isLobbyHost(Player player) {
+        return player != null && lobbyHostId != null && lobbyHostId.equals(player.getUniqueId());
     }
 
     public Location getLobbyOrFallback(Location fallback) {
@@ -456,7 +517,7 @@ public final class GameManager {
         if (target != null && target.getWorld() != null) {
             player.teleport(target);
         }
-        giveLanguageSelector(player);
+        giveLobbyUtilityItems(player);
     }
 
     public void prepareMatchPlayer(Player player) {
@@ -505,7 +566,7 @@ public final class GameManager {
             if (exit != null && exit.getWorld() != null) {
                 player.teleport(exit);
             }
-            giveLanguageSelector(player);
+            giveLobbyUtilityItems(player);
             return;
         }
 
@@ -518,7 +579,7 @@ public final class GameManager {
             player.setGameMode(GameMode.SURVIVAL);
             resetMainScoreboard(player);
             if (dedicatedServerMode) {
-                giveLanguageSelector(player);
+                giveLobbyUtilityItems(player);
             }
             return;
         }
@@ -565,14 +626,59 @@ public final class GameManager {
         currentArena.transferQueuedPlayersTo(nextArena, playersToMove);
     }
 
+    public void startSuddenNightSession(Arena arena) {
+        if (!suddenNightEnabled || arena == null || arena.getWorld() == null) {
+            return;
+        }
+
+        UUID worldId = arena.getWorld().getUID();
+        SuddenNightWorldState state = suddenNightStates.computeIfAbsent(worldId, ignored -> new SuddenNightWorldState(arena.getWorld()));
+        state.activeSessions++;
+        if (state.activeSessions > 1 || state.completedCycle || state.startTask != null || state.nightTask != null) {
+            return;
+        }
+
+        resetWorldToDay(state.world);
+        state.startTask = plugin.getServer().getScheduler().runTaskLater(
+            plugin,
+            () -> startSuddenNight(worldId),
+            suddenNightDelaySeconds * 20L
+        );
+    }
+
+    public void endSuddenNightSession(Arena arena) {
+        if (arena == null || arena.getWorld() == null) {
+            return;
+        }
+
+        UUID worldId = arena.getWorld().getUID();
+        SuddenNightWorldState state = suddenNightStates.get(worldId);
+        if (state == null) {
+            resetWorldToDay(arena.getWorld());
+            return;
+        }
+
+        state.activeSessions = Math.max(0, state.activeSessions - 1);
+        if (state.activeSessions > 0) {
+            return;
+        }
+
+        cancelSuddenNightState(state, true);
+        suddenNightStates.remove(worldId);
+    }
+
     public void handleQuit(Player player) {
         Arena arena = getArena(player);
         if (arena != null) {
             arena.leave(player, "reason.server_leave");
         }
+        unregisterLobbyHostJoin(player);
+        handleLobbyHostDeparture(player);
     }
 
     public void handleJoin(Player player) {
+        registerLobbyHostJoin(player);
+        ensureLobbyHostAssigned(player);
         forceLobbyFlow(player, true);
     }
 
@@ -616,7 +722,7 @@ public final class GameManager {
                 if (target != null && target.getWorld() != null) {
                     player.teleport(target);
                 }
-                giveLanguageSelector(player);
+                giveLobbyUtilityItems(player);
             }
 
             if (autoQueue && autoQueueOnJoin && defaultArenaId != null && !defaultArenaId.isBlank()) {
@@ -628,11 +734,170 @@ public final class GameManager {
     private void restoreOnlinePlayersAfterReload() {
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
+                registerLobbyHostJoin(player);
                 if (getArena(player) == null) {
                     forceLobbyFlow(player, true);
                 }
             }
+            ensureLobbyHostAssigned(null);
+            refreshLobbyUtilityItemsForOnlinePlayers();
         }, 1L);
+    }
+
+    private void startSuddenNight(UUID worldId) {
+        SuddenNightWorldState state = suddenNightStates.get(worldId);
+        if (state == null) {
+            return;
+        }
+
+        state.startTask = null;
+        if (state.activeSessions <= 0) {
+            cancelSuddenNightState(state, true);
+            suddenNightStates.remove(worldId);
+            return;
+        }
+
+        state.completedCycle = true;
+        World world = state.world;
+        if (world == null) {
+            suddenNightStates.remove(worldId);
+            return;
+        }
+
+        world.setTime(DEFAULT_WORLD_NIGHT_TIME);
+        world.setStorm(false);
+        announceSuddenNight(world, true);
+
+        state.nightTask = plugin.getServer().getScheduler().runTaskLater(
+            plugin,
+            () -> endSuddenNight(worldId),
+            suddenNightDurationSeconds * 20L
+        );
+    }
+
+    private void endSuddenNight(UUID worldId) {
+        SuddenNightWorldState state = suddenNightStates.get(worldId);
+        if (state == null) {
+            return;
+        }
+
+        state.nightTask = null;
+        resetWorldToDay(state.world);
+        announceSuddenNight(state.world, false);
+
+        if (state.activeSessions <= 0) {
+            suddenNightStates.remove(worldId);
+        }
+    }
+
+    private void announceSuddenNight(World world, boolean started) {
+        if (world == null) {
+            return;
+        }
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!world.getUID().equals(player.getWorld().getUID()) || getArena(player) == null) {
+                continue;
+            }
+
+            if (started) {
+                sendLocalized(player, "arena.sudden_night_started");
+                player.sendTitle(
+                    tr(player, "arena.sudden_night_title"),
+                    tr(player, "arena.sudden_night_subtitle"),
+                    10,
+                    60,
+                    10
+                );
+            } else {
+                sendLocalized(player, "arena.sudden_night_ended");
+                player.sendTitle(
+                    tr(player, "arena.day_returns_title"),
+                    tr(player, "arena.day_returns_subtitle"),
+                    10,
+                    50,
+                    10
+                );
+            }
+        }
+    }
+
+    private void clearSuddenNightStates() {
+        for (SuddenNightWorldState state : suddenNightStates.values()) {
+            cancelSuddenNightState(state, true);
+        }
+        suddenNightStates.clear();
+    }
+
+    private void startStaticDaylightTask() {
+        stopStaticDaylightTask();
+        staticDaylightTask = plugin.getServer().getScheduler().runTaskTimer(
+            plugin,
+            this::enforceStaticDaylight,
+            1L,
+            5L
+        );
+    }
+
+    private void stopStaticDaylightTask() {
+        if (staticDaylightTask != null) {
+            staticDaylightTask.cancel();
+            staticDaylightTask = null;
+        }
+    }
+
+    private void enforceStaticDaylight() {
+        Set<World> worlds = new java.util.HashSet<>();
+        if (lobbyLocation != null && lobbyLocation.getWorld() != null) {
+            worlds.add(lobbyLocation.getWorld());
+        }
+        for (Arena arena : arenas.values()) {
+            World world = arena.getWorld();
+            if (world != null) {
+                worlds.add(world);
+            }
+        }
+        for (World world : worlds) {
+            if (hasActiveSuddenNight(world)) {
+                continue;
+            }
+            resetWorldToDay(world);
+        }
+    }
+
+    private boolean hasActiveSuddenNight(World world) {
+        if (world == null) {
+            return false;
+        }
+        SuddenNightWorldState state = suddenNightStates.get(world.getUID());
+        return state != null && state.nightTask != null;
+    }
+
+    private void cancelSuddenNightState(SuddenNightWorldState state, boolean resetDay) {
+        if (state == null) {
+            return;
+        }
+        if (state.startTask != null) {
+            state.startTask.cancel();
+            state.startTask = null;
+        }
+        if (state.nightTask != null) {
+            state.nightTask.cancel();
+            state.nightTask = null;
+        }
+        if (resetDay) {
+            resetWorldToDay(state.world);
+        }
+    }
+
+    private void resetWorldToDay(World world) {
+        if (world == null) {
+            return;
+        }
+        world.setGameRule(GameRules.ADVANCE_TIME, false);
+        world.setGameRule(GameRules.ADVANCE_WEATHER, false);
+        world.setTime(DEFAULT_WORLD_DAY_TIME);
+        world.setStorm(false);
     }
 
     public void filterExplosion(List<Block> blocks, Location location) {
@@ -706,6 +971,15 @@ public final class GameManager {
         return meta != null && meta.getPersistentDataContainer().has(languageSelectorItemKey, PersistentDataType.BYTE);
     }
 
+    public boolean isLobbyHostItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(lobbyHostItemKey, PersistentDataType.BYTE);
+    }
+
     public boolean isProfileMenu(Inventory inventory) {
         return inventory != null && inventory.getHolder() instanceof ProfileMenuHolder;
     }
@@ -720,6 +994,14 @@ public final class GameManager {
 
     public boolean isAboutMenu(Inventory inventory) {
         return inventory != null && inventory.getHolder() instanceof AboutMenuHolder;
+    }
+
+    public boolean isHostMenu(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof HostMenuHolder;
+    }
+
+    public boolean isHostTransferMenu(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof HostTransferMenuHolder;
     }
 
     public void openProfileMenu(Player player) {
@@ -795,6 +1077,64 @@ public final class GameManager {
         }
     }
 
+    public void openHostMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder();
+        Inventory inventory = Bukkit.createInventory(holder, 45, tr(player, "host.menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(10, createHostSuddenNightItem(player));
+        inventory.setItem(12, createHostRoundsAdjustItem(player, -1));
+        inventory.setItem(13, createHostRoundsDisplayItem(player));
+        inventory.setItem(14, createHostRoundsAdjustItem(player, 1));
+        inventory.setItem(16, createHostArenaCycleItem(player));
+        inventory.setItem(28, createHostAutostartItem(player));
+        inventory.setItem(31, createHostTransferItem(player));
+        inventory.setItem(40, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void openHostTransferMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostTransferMenuHolder holder = new HostTransferMenuHolder();
+        Inventory inventory = Bukkit.createInventory(holder, 54, tr(player, "host.transfer_menu_title"));
+        holder.setInventory(inventory);
+
+        List<Player> targets = new ArrayList<>(
+            Bukkit.getOnlinePlayers().stream()
+                .filter(Player::isOnline)
+                .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
+                .sorted(
+                    Comparator.comparingLong((Player target) -> lobbyHostJoinOrder.getOrDefault(target.getUniqueId(), Long.MAX_VALUE))
+                        .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER)
+                )
+                .toList()
+        );
+
+        if (targets.isEmpty()) {
+            inventory.setItem(22, createHostTransferEmptyItem(player));
+        } else {
+            int slot = 0;
+            for (Player target : targets) {
+                if (slot >= 45) {
+                    break;
+                }
+                inventory.setItem(slot, createHostTransferTargetItem(player, target));
+                slot++;
+            }
+        }
+
+        inventory.setItem(49, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
     public void handleLanguageMenuClick(Player player, ItemStack clickedItem) {
         if (clickedItem == null || clickedItem.getType().isAir()) {
             return;
@@ -822,23 +1162,207 @@ public final class GameManager {
         sendLocalized(player, "language.changed", "language", tr(selected, "language.option_" + selected.getCode()));
     }
 
+    public void handleHostMenuClick(Player player, ItemStack clickedItem) {
+        if (clickedItem == null || clickedItem.getType().isAir()) {
+            return;
+        }
+        if (!isLobbyHost(player)) {
+            player.closeInventory();
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        ItemMeta meta = clickedItem.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(menuBackItemKey, PersistentDataType.BYTE)) {
+            player.closeInventory();
+            return;
+        }
+        if (meta.getPersistentDataContainer().has(hostMenuToggleSuddenNightItemKey, PersistentDataType.BYTE)) {
+            suddenNightEnabled = !suddenNightEnabled;
+            if (!suddenNightEnabled) {
+                clearSuddenNightStates();
+                enforceStaticDaylight();
+            }
+            sendLocalized(player, "host.sudden_night_changed", "status", getHostStatusText(player, suddenNightEnabled));
+            openHostMenu(player);
+            return;
+        }
+
+        Integer roundsDelta = meta.getPersistentDataContainer().get(hostMenuRoundsAdjustItemKey, PersistentDataType.INTEGER);
+        if (roundsDelta != null) {
+            setLobbyRoundsBeforeReset(Math.max(1, lobbyRoundsBeforeReset + roundsDelta));
+            sendLocalized(player, "host.rounds_changed", "value", lobbyRoundsBeforeReset);
+            openHostMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuArenaCycleItemKey, PersistentDataType.BYTE)) {
+            cycleLobbyArena();
+            sendLocalized(player, "host.map_changed", "map", getLobbyMapDisplay(player));
+            openHostMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuAutostartItemKey, PersistentDataType.BYTE)) {
+            setLobbyAutostartEnabled(!lobbyAutostartEnabled);
+            sendLocalized(player, "host.autostart_changed", "status", getHostStatusText(player, lobbyAutostartEnabled));
+            openHostMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuTransferItemKey, PersistentDataType.BYTE)) {
+            openHostTransferMenu(player);
+        }
+    }
+
+    public void handleHostTransferMenuClick(Player player, ItemStack clickedItem) {
+        if (clickedItem == null || clickedItem.getType().isAir()) {
+            return;
+        }
+        if (!isLobbyHost(player)) {
+            player.closeInventory();
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+        if (isBackItem(clickedItem)) {
+            openHostMenu(player);
+            return;
+        }
+
+        ItemMeta meta = clickedItem.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        String rawTargetId = meta.getPersistentDataContainer().get(hostTransferTargetItemKey, PersistentDataType.STRING);
+        if (rawTargetId == null || rawTargetId.isBlank()) {
+            return;
+        }
+
+        UUID targetId;
+        try {
+            targetId = UUID.fromString(rawTargetId);
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+
+        Player target = Bukkit.getPlayer(targetId);
+        if (target == null || !target.isOnline()) {
+            sendLocalized(player, "host.transfer_target_unavailable");
+            openHostTransferMenu(player);
+            return;
+        }
+
+        if (target.getUniqueId().equals(player.getUniqueId())) {
+            return;
+        }
+
+        lobbyHostId = target.getUniqueId();
+        refreshLobbyUtilityItemsForOnlinePlayers();
+        player.closeInventory();
+        sendLocalized(player, "host.transfer_sent", "player", target.getName());
+        sendLocalized(target, "host.transfer_received", "player", player.getName());
+    }
+
     public void refreshLocalizedPlayerState(Player player) {
         if (player == null || !player.isOnline()) {
             return;
         }
 
         Arena arena = getArena(player);
-        if (arena != null) {
-            arena.refreshPlayerLocale(player);
-            if (arena.isSpectator(player)) {
-                player.getInventory().setItem(8, createSpectatorExitItem(player));
-            } else if (!arena.isActivePlayer(player)) {
-                giveLanguageSelector(player);
-            }
+            if (arena != null) {
+                arena.refreshPlayerLocale(player);
+                if (arena.isSpectator(player)) {
+                    player.getInventory().setItem(8, createSpectatorExitItem(player));
+                } else if (!arena.isActivePlayer(player)) {
+                    giveLobbyUtilityItems(player);
+                }
+                return;
+        }
+
+        giveLobbyUtilityItems(player);
+    }
+
+    private void registerLobbyHostJoin(Player player) {
+        if (player == null) {
+            return;
+        }
+        lobbyHostJoinOrder.putIfAbsent(player.getUniqueId(), nextLobbyJoinOrder++);
+    }
+
+    private void unregisterLobbyHostJoin(Player player) {
+        if (player == null) {
+            return;
+        }
+        lobbyHostJoinOrder.remove(player.getUniqueId());
+    }
+
+    private void ensureLobbyHostAssigned(Player preferredPlayer) {
+        Player currentHost = lobbyHostId == null ? null : Bukkit.getPlayer(lobbyHostId);
+        if (currentHost != null && currentHost.isOnline()) {
+            refreshLobbyUtilityItemsForOnlinePlayers();
             return;
         }
 
-        giveLanguageSelector(player);
+        Player nextHost = findNextLobbyHostCandidate();
+        if (nextHost == null && preferredPlayer != null && preferredPlayer.isOnline()) {
+            nextHost = preferredPlayer;
+        }
+
+        UUID previousHostId = lobbyHostId;
+        lobbyHostId = nextHost != null ? nextHost.getUniqueId() : null;
+        refreshLobbyUtilityItemsForOnlinePlayers();
+
+        if (nextHost != null && !nextHost.getUniqueId().equals(previousHostId)) {
+            sendLocalized(nextHost, "host.assigned");
+        }
+    }
+
+    private void handleLobbyHostDeparture(Player player) {
+        if (!isLobbyHost(player)) {
+            return;
+        }
+        lobbyHostId = null;
+        Player nextHost = findNextLobbyHostCandidate();
+        if (nextHost != null) {
+            lobbyHostId = nextHost.getUniqueId();
+            sendLocalized(nextHost, "host.assigned");
+        }
+        refreshLobbyUtilityItemsForOnlinePlayers();
+    }
+
+    private Player findNextLobbyHostCandidate() {
+        return Bukkit.getOnlinePlayers().stream()
+            .filter(Player::isOnline)
+            .min(
+                Comparator.comparingLong((Player player) -> lobbyHostJoinOrder.getOrDefault(player.getUniqueId(), Long.MAX_VALUE))
+                    .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER)
+            )
+            .orElse(null);
+    }
+
+    private void refreshLobbyUtilityItemsForOnlinePlayers() {
+        for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+            giveLobbyUtilityItems(onlinePlayer);
+        }
+    }
+
+    private void giveLobbyUtilityItems(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+
+        clearTaggedItems(player, item -> isLanguageSelectorItem(item) || isLobbyHostItem(item));
+        if (shouldGiveLanguageSelector(player)) {
+            player.getInventory().setItem(0, createLanguageSelectorItem(player));
+        }
+        if (shouldGiveLobbyHostItem(player)) {
+            player.getInventory().setItem(4, createLobbyHostItem(player));
+        }
     }
 
     private Arena resolveArenaForJoin(String arenaId) {
@@ -925,6 +1449,24 @@ public final class GameManager {
         player.setCanPickupItems(true);
     }
 
+    private void clearTaggedItems(Player player, Predicate<ItemStack> predicate) {
+        if (player == null || predicate == null) {
+            return;
+        }
+
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            if (predicate.test(contents[slot])) {
+                player.getInventory().setItem(slot, null);
+            }
+        }
+
+        ItemStack offHand = player.getInventory().getItemInOffHand();
+        if (predicate.test(offHand)) {
+            player.getInventory().setItemInOffHand(null);
+        }
+    }
+
     private void giveLanguageSelector(Player player) {
         if (!shouldGiveLanguageSelector(player)) {
             return;
@@ -933,6 +1475,14 @@ public final class GameManager {
     }
 
     private boolean shouldGiveLanguageSelector(Player player) {
+        return isLobbyUtilityEligible(player);
+    }
+
+    private boolean shouldGiveLobbyHostItem(Player player) {
+        return isLobbyHost(player) && isLobbyUtilityEligible(player);
+    }
+
+    private boolean isLobbyUtilityEligible(Player player) {
         Arena arena = getArena(player);
         return arena == null || (!arena.isActivePlayer(player) && !arena.isSpectator(player));
     }
@@ -944,6 +1494,18 @@ public final class GameManager {
             meta.setDisplayName(tr(player, "profile.selector_name"));
             meta.setLore(trList(player, "profile.selector_lore"));
             meta.getPersistentDataContainer().set(languageSelectorItemKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createLobbyHostItem(Player player) {
+        ItemStack item = new ItemStack(Material.NETHER_STAR);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.selector_name"));
+            meta.setLore(trList(player, "host.selector_lore"));
+            meta.getPersistentDataContainer().set(lobbyHostItemKey, PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
         return item;
@@ -1035,6 +1597,134 @@ public final class GameManager {
         return item;
     }
 
+    private ItemStack createHostSuddenNightItem(Player player) {
+        ItemStack item = new ItemStack(Material.DAYLIGHT_DETECTOR);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.sudden_night_name"));
+            meta.setLore(trList(
+                player,
+                "host.sudden_night_lore",
+                "status", getHostStatusText(player, suddenNightEnabled),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightItemKey, PersistentDataType.BYTE, (byte) 1);
+            if (suddenNightEnabled) {
+                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostRoundsAdjustItem(Player player, int delta) {
+        ItemStack item = new ItemStack(delta > 0 ? Material.LIME_DYE : Material.RED_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, delta > 0 ? "host.rounds_plus_name" : "host.rounds_minus_name"));
+            meta.setLore(trList(
+                player,
+                delta > 0 ? "host.rounds_plus_lore" : "host.rounds_minus_lore",
+                "value", lobbyRoundsBeforeReset
+            ));
+            meta.getPersistentDataContainer().set(hostMenuRoundsAdjustItemKey, PersistentDataType.INTEGER, delta);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostRoundsDisplayItem(Player player) {
+        ItemStack item = new ItemStack(Material.CLOCK);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.rounds_info_name"));
+            meta.setLore(trList(player, "host.rounds_info_lore", "value", lobbyRoundsBeforeReset));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostArenaCycleItem(Player player) {
+        ItemStack item = new ItemStack(Material.FILLED_MAP);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.map_name"));
+            meta.setLore(trList(
+                player,
+                "host.map_lore",
+                "map", getLobbyMapDisplay(player),
+                "action", tr(player, "host.click_cycle_map")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuArenaCycleItemKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostAutostartItem(Player player) {
+        ItemStack item = new ItemStack(Material.LEVER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.autostart_name"));
+            meta.setLore(trList(
+                player,
+                "host.autostart_lore",
+                "status", getHostStatusText(player, lobbyAutostartEnabled),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuAutostartItemKey, PersistentDataType.BYTE, (byte) 1);
+            if (lobbyAutostartEnabled) {
+                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostTransferItem(Player player) {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        ItemMeta rawMeta = item.getItemMeta();
+        if (!(rawMeta instanceof SkullMeta meta)) {
+            return item;
+        }
+
+        meta.setOwningPlayer(player);
+        meta.setDisplayName(tr(player, "host.transfer_name"));
+        meta.setLore(trList(player, "host.transfer_lore"));
+        meta.getPersistentDataContainer().set(hostMenuTransferItemKey, PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createHostTransferTargetItem(Player viewer, Player target) {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        ItemMeta rawMeta = item.getItemMeta();
+        if (!(rawMeta instanceof SkullMeta meta)) {
+            return item;
+        }
+
+        OfflinePlayer offlineTarget = target;
+        meta.setOwningPlayer(offlineTarget);
+        meta.setDisplayName(tr(viewer, "host.transfer_target_name", "player", target.getName()));
+        meta.setLore(trList(viewer, "host.transfer_target_lore"));
+        meta.getPersistentDataContainer().set(hostTransferTargetItemKey, PersistentDataType.STRING, target.getUniqueId().toString());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createHostTransferEmptyItem(Player player) {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.transfer_empty_name"));
+            meta.setLore(trList(player, "host.transfer_empty_lore"));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private boolean isBackItem(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;
@@ -1075,6 +1765,98 @@ public final class GameManager {
         long minutes = roundedSeconds / 60L;
         long seconds = roundedSeconds % 60L;
         return String.format(Locale.ROOT, "%d:%02d", minutes, seconds);
+    }
+
+    private String getHostStatusText(Player player, boolean enabled) {
+        return tr(player, enabled ? "host.status_enabled" : "host.status_disabled");
+    }
+
+    private void setLobbyRoundsBeforeReset(int roundsBeforeReset) {
+        lobbyRoundsBeforeReset = Math.max(1, roundsBeforeReset);
+        for (Arena arena : arenas.values()) {
+            arena.setRoundsBeforeReset(lobbyRoundsBeforeReset);
+        }
+    }
+
+    private void setLobbyAutostartEnabled(boolean enabled) {
+        lobbyAutostartEnabled = enabled;
+        for (Arena arena : arenas.values()) {
+            arena.reevaluateCountdownState();
+        }
+    }
+
+    private void cycleLobbyArena() {
+        List<Arena> arenaList = new ArrayList<>(arenas.values());
+        if (arenaList.isEmpty()) {
+            defaultArenaId = "random";
+            return;
+        }
+
+        if (isRandomLobbyArenaSelected()) {
+            Arena selectedArena = arenaList.get(0);
+            defaultArenaId = selectedArena.getId();
+            moveQueuedPlayersToSelectedArena(selectedArena);
+            return;
+        }
+
+        int currentIndex = -2;
+        for (int index = 0; index < arenaList.size(); index++) {
+            Arena arena = arenaList.get(index);
+            if (arena.getId().equalsIgnoreCase(defaultArenaId)) {
+                currentIndex = index;
+                break;
+            }
+        }
+
+        if (currentIndex == -2 || currentIndex >= arenaList.size() - 1) {
+            defaultArenaId = "random";
+            return;
+        }
+
+        Arena selectedArena = arenaList.get(currentIndex + 1);
+        defaultArenaId = selectedArena.getId();
+        moveQueuedPlayersToSelectedArena(selectedArena);
+    }
+
+    private Arena getSelectedLobbyArena() {
+        return defaultArenaId == null ? null : arenas.get(defaultArenaId.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean isRandomLobbyArenaSelected() {
+        return defaultArenaId == null || defaultArenaId.isBlank() || "random".equalsIgnoreCase(defaultArenaId);
+    }
+
+    private String getLobbyMapDisplay(Player player) {
+        Arena selectedArena = getSelectedLobbyArena();
+        if (selectedArena != null) {
+            return selectedArena.getDisplayName();
+        }
+        return tr(player, "host.map_random");
+    }
+
+    private void moveQueuedPlayersToSelectedArena(Arena selectedArena) {
+        if (selectedArena == null) {
+            return;
+        }
+
+        int pendingPlayers = arenas.values().stream()
+            .filter(arena -> arena != selectedArena)
+            .filter(arena -> arena.getState() != GameState.RUNNING && arena.getState() != GameState.ENDING)
+            .mapToInt(Arena::getPlayerCount)
+            .sum();
+        if (pendingPlayers <= 0 || selectedArena.getPlayerCount() + pendingPlayers > selectedArena.getMaxPlayers()) {
+            return;
+        }
+
+        for (Arena arena : arenas.values()) {
+            if (arena == selectedArena || arena.getState() == GameState.RUNNING || arena.getState() == GameState.ENDING) {
+                continue;
+            }
+            List<UUID> queuedPlayers = arena.getQueuedPlayersSnapshot();
+            if (!queuedPlayers.isEmpty()) {
+                arena.transferQueuedPlayersTo(selectedArena, queuedPlayers);
+            }
+        }
     }
 
     private ItemStack createLanguageOptionItem(Player viewer, PlayerLanguage option, Material material) {
@@ -1233,7 +2015,7 @@ public final class GameManager {
         world.setGameRule(GameRules.ADVANCE_TIME, false);
         world.setGameRule(GameRules.ADVANCE_WEATHER, false);
         world.setGameRule(GameRules.MOB_GRIEFING, false);
-        world.setTime(6000L);
+        world.setTime(DEFAULT_WORLD_DAY_TIME);
         world.setStorm(false);
 
         boolean autoBuildDefaultMap = settings == null || settings.getBoolean("auto-build-default-map", true);
@@ -1243,6 +2025,18 @@ public final class GameManager {
                 return;
             }
             DefaultMapBuilder.ensureBuilt(world);
+        }
+    }
+
+    private static final class SuddenNightWorldState {
+        private final World world;
+        private int activeSessions;
+        private boolean completedCycle;
+        private BukkitTask startTask;
+        private BukkitTask nightTask;
+
+        private SuddenNightWorldState(World world) {
+            this.world = world;
         }
     }
 }

@@ -235,7 +235,8 @@ public final class DropTable {
             return null;
         }
 
-        int durationSeconds = Math.max(1, section.getInt("duration-seconds", 5));
+        Object durationConfig = section.get("duration-seconds");
+        AmountRange durationSeconds = durationConfig == null ? new AmountRange(5, 5) : AmountRange.parse(durationConfig);
         int amplifier = Math.max(0, section.getInt("amplifier", 0));
         return new EffectDrop(weight, effectType, durationSeconds, amplifier);
     }
@@ -482,7 +483,12 @@ public final class DropTable {
         }
     }
 
-    private record EffectDrop(double weight, PotionEffectType effectType, int durationSeconds, int amplifier) implements DropAction {
+    private record EffectDrop(
+        double weight,
+        PotionEffectType effectType,
+        AmountRange durationSeconds,
+        int amplifier
+    ) implements DropAction {
 
         @Override
         public String key() {
@@ -491,12 +497,13 @@ public final class DropTable {
 
         @Override
         public void apply(Player player, Arena arena) {
-            player.addPotionEffect(new PotionEffect(effectType, durationSeconds * 20, amplifier, true, true, true));
+            int rolledDurationSeconds = durationSeconds.roll();
+            player.addPotionEffect(new PotionEffect(effectType, rolledDurationSeconds * 20, amplifier, true, true, true));
             arena.sendLocalized(
                 player,
                 "drop.effect",
                 "effect", prettify(effectType.getKey().getKey()),
-                "seconds", durationSeconds,
+                "seconds", rolledDurationSeconds,
                 "level", amplifier + 1
             );
         }

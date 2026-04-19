@@ -58,7 +58,7 @@ public final class Arena {
     private final boolean allowPlaceBlocks;
     private final boolean allowBreakMapBlocks;
     private final boolean onlyBreakOwnPlacedBlocks;
-    private final int roundsBeforeReset;
+    private int roundsBeforeReset;
     private final int roundStartFreezeTicks;
     private final int minX;
     private final int maxX;
@@ -91,6 +91,7 @@ public final class Arena {
     private int intermissionDurationSeconds;
     private int currentRound;
     private long roundStartedAtMillis;
+    private boolean suddenNightSessionActive;
 
     public Arena(
         GameManager manager,
@@ -194,6 +195,15 @@ public final class Arena {
 
     public int getRoundsBeforeReset() {
         return roundsBeforeReset;
+    }
+
+    public void setRoundsBeforeReset(int roundsBeforeReset) {
+        this.roundsBeforeReset = Math.max(1, roundsBeforeReset);
+        updateSidebar();
+    }
+
+    public void reevaluateCountdownState() {
+        evaluateCountdown();
     }
 
     public double getEliminateBelowY() {
@@ -449,6 +459,9 @@ public final class Arena {
         } else {
             destination.updateSidebar();
         }
+        if (players.isEmpty()) {
+            endSuddenNightSessionIfNeeded();
+        }
         destination.broadcastLocalized("arena.random_map_changed", "arena", destination.getDisplayName());
     }
 
@@ -574,6 +587,15 @@ public final class Arena {
 
     private void evaluateCountdown() {
         if (state == GameState.RUNNING || state == GameState.ENDING) {
+            return;
+        }
+
+        if (!manager.isLobbyAutostartEnabled()) {
+            if (state == GameState.COUNTDOWN) {
+                cancelCountdown(false);
+            } else {
+                updateWaitingBar();
+            }
             return;
         }
 
@@ -704,6 +726,7 @@ public final class Arena {
         }
 
         roundStartedAtMillis = System.currentTimeMillis();
+        beginSuddenNightSessionIfNeeded();
 
         refreshVisibility();
         updateSidebar();
@@ -878,6 +901,7 @@ public final class Arena {
 
     private void resetArena(boolean cleanupBlocks) {
         cancelAllTasks();
+        endSuddenNightSessionIfNeeded();
         if (cleanupBlocks) {
             restoreArenaRegion();
         }
@@ -1101,6 +1125,22 @@ public final class Arena {
             return waitingSpawn.clone();
         }
         return new Location(world, region.getCenterX(), region.getMaxY() + 3.0D, region.getCenterZ());
+    }
+
+    private void beginSuddenNightSessionIfNeeded() {
+        if (suddenNightSessionActive) {
+            return;
+        }
+        manager.startSuddenNightSession(this);
+        suddenNightSessionActive = true;
+    }
+
+    private void endSuddenNightSessionIfNeeded() {
+        if (!suddenNightSessionActive) {
+            return;
+        }
+        manager.endSuddenNightSession(this);
+        suddenNightSessionActive = false;
     }
 
     private void playArenaSound(Sound sound, float volume, float pitch) {

@@ -6,7 +6,7 @@ Players join a lobby, get sent into a random arena, and fight through multiple r
 
 ## Latest Version
 
-`1.0.0-beta.3+11`
+`1.0.0-beta.5`
 
 ## How Matches Work
 
@@ -29,6 +29,16 @@ To use SkyRandom, you must install it on a Paper server:
 ## Supported Server Software
 
 - Paper
+
+## Supported Minecraft / Paper Versions
+
+- Paper 1.21.11
+- Paper 26.1.1
+- Paper 26.1.2
+
+Paper 1.21.11 was smoke-tested on Java 21.
+
+Paper 26.1.1 and 26.1.2 were smoke-tested on Java 25.
 
 ## Beta Status
 

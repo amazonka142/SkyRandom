@@ -18,6 +18,9 @@ settings:
   arena-border-warning-distance: 4
   player-boundary-margin: 12.0
   player-max-y-margin: 64.0
+  sudden-night-enabled: true
+  sudden-night-delay-seconds: 300
+  sudden-night-duration-seconds: 180
   drop-interval-ticks: 100
   countdown-seconds: 12
   win-delay-seconds: 0
@@ -465,6 +468,46 @@ loot-table:
         effect: DARKNESS
         duration-seconds: 6
         amplifier: 0
+      - type: effect
+        weight: 2
+        effect: GLOWING
+        duration-seconds: 8-10
+        amplifier: 0
+      - type: effect
+        weight: 2
+        effect: WEAKNESS
+        duration-seconds: 6-8
+        amplifier: 0
+      - type: effect
+        weight: 2
+        effect: SLOWNESS
+        duration-seconds: 4-5
+        amplifier: 1
+      - type: effect
+        weight: 1
+        effect: POISON
+        duration-seconds: 3-4
+        amplifier: 0
+      - type: effect
+        weight: 1
+        effect: FIRE_RESISTANCE
+        duration-seconds: 8-10
+        amplifier: 0
+      - type: effect
+        weight: 0.8
+        effect: STRENGTH
+        duration-seconds: 4-5
+        amplifier: 0
+      - type: effect
+        weight: 0.8
+        effect: REGENERATION
+        duration-seconds: 3-4
+        amplifier: 0
+      - type: effect
+        weight: 0.6
+        effect: RESISTANCE
+        duration-seconds: 4-5
+        amplifier: 0
       - type: item
         weight: 2
         material: STICK
@@ -582,6 +625,10 @@ loot-table:
         weight: 0.8
         material: SHIELD
         amount: 1
+      - type: item
+        weight: 1.2
+        material: GOLDEN_APPLE
+        amount: 1
       - type: bundle
         key: archer_kit
         weight: 1
@@ -616,6 +663,11 @@ loot-table:
         material: WIND_CHARGE
         amount: 2-4
         name: "&6Ultra Wind Charge"
+      - type: item
+        weight: 0.12
+        material: ENCHANTED_GOLDEN_APPLE
+        amount: 1
+        name: "&6Ultra Enchanted Apple"
       - type: item
         weight: 0.35
         material: NETHERITE_SWORD
@@ -800,4 +852,61 @@ arenas:
         y: 71.0
         z: 18.5
         yaw: -35.0
+        pitch: 0.0
+  ring:
+    display-name: "&dRing"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 58
+    max-build-y: 96
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 255
+        y: -64
+        z: -40
+      max:
+        x: 345
+        y: 130
+        z: 40
+    spawns:
+      - world: skyrandom_void
+        x: 300.5
+        y: 71.0
+        z: -20.5
+        yaw: 0.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 320.5
+        y: 71.0
+        z: 0.5
+        yaw: 90.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 300.5
+        y: 71.0
+        z: 20.5
+        yaw: 180.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 280.5
+        y: 71.0
+        z: 0.5
+        yaw: -90.0
         pitch: 0.0

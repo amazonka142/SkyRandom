@@ -163,9 +163,16 @@ public final class GameListener implements Listener {
         Player player = event.getPlayer();
         Arena arena = gameManager.getArena(player);
         if (arena == null || !arena.isSpectator(player)) {
-            if (event.getHand() == EquipmentSlot.HAND && gameManager.isLanguageSelectorItem(event.getItem())) {
-                event.setCancelled(true);
-                gameManager.openProfileMenu(player);
+            if (event.getHand() == EquipmentSlot.HAND) {
+                if (gameManager.isLanguageSelectorItem(event.getItem())) {
+                    event.setCancelled(true);
+                    gameManager.openProfileMenu(player);
+                    return;
+                }
+                if (gameManager.isLobbyHostItem(event.getItem())) {
+                    event.setCancelled(true);
+                    gameManager.openHostMenu(player);
+                }
             }
             return;
         }
@@ -215,6 +222,22 @@ public final class GameListener implements Listener {
                 return;
             }
 
+            if (gameManager.isHostMenu(event.getView().getTopInventory())) {
+                event.setCancelled(true);
+                if (event.getClickedInventory() == event.getView().getTopInventory()) {
+                    gameManager.handleHostMenuClick(player, event.getCurrentItem());
+                }
+                return;
+            }
+
+            if (gameManager.isHostTransferMenu(event.getView().getTopInventory())) {
+                event.setCancelled(true);
+                if (event.getClickedInventory() == event.getView().getTopInventory()) {
+                    gameManager.handleHostTransferMenuClick(player, event.getCurrentItem());
+                }
+                return;
+            }
+
             Arena arena = gameManager.getArena(player);
             if (arena != null && arena.isSpectator(player)) {
                 event.setCancelled(true);
@@ -227,7 +250,8 @@ public final class GameListener implements Listener {
         Player player = event.getPlayer();
         Arena arena = gameManager.getArena(player);
         if ((arena != null && arena.isSpectator(player))
-            || gameManager.isLanguageSelectorItem(event.getItemDrop().getItemStack())) {
+            || gameManager.isLanguageSelectorItem(event.getItemDrop().getItemStack())
+            || gameManager.isLobbyHostItem(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }

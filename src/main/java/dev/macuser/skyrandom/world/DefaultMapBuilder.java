@@ -8,7 +8,7 @@ import org.bukkit.block.Block;
 public final class DefaultMapBuilder {
 
     private static final int DEMO_REGION_MIN_X = -40;
-    private static final int DEMO_REGION_MAX_X = 240;
+    private static final int DEMO_REGION_MAX_X = 350;
     private static final int DEMO_REGION_MAX_Y = 130;
     private static final int DEMO_REGION_MIN_Z = -40;
     private static final int DEMO_REGION_MAX_Z = 40;
@@ -18,6 +18,9 @@ public final class DefaultMapBuilder {
     private static final int WRECKAGE_CENTER_X = 190;
     private static final int WRECKAGE_CENTER_Z = 0;
     private static final int WRECKAGE_PLATFORM_Y = 70;
+    private static final int RING_CENTER_X = 300;
+    private static final int RING_CENTER_Z = 0;
+    private static final int RING_PLATFORM_Y = 70;
 
     private static final Material[] WRECKAGE_SURFACE = {
         Material.STONE_BRICKS,
@@ -39,6 +42,19 @@ public final class DefaultMapBuilder {
         Material.POLISHED_DEEPSLATE,
         Material.COBBLED_DEEPSLATE,
         Material.TUFF_BRICKS
+    };
+    private static final Material[] RING_SURFACE = {
+        Material.CUT_COPPER,
+        Material.EXPOSED_CUT_COPPER,
+        Material.WEATHERED_CUT_COPPER,
+        Material.DARK_PRISMARINE,
+        Material.PRISMARINE_BRICKS
+    };
+    private static final Material[] RING_FILL = {
+        Material.TUFF_BRICKS,
+        Material.POLISHED_ANDESITE,
+        Material.POLISHED_DEEPSLATE,
+        Material.DEEPSLATE_TILES
     };
 
     private static final String[] WRECKAGE_SPAWN_TOP = {
@@ -149,6 +165,7 @@ public final class DefaultMapBuilder {
         buildPillarsArena(world);
         buildCentralThroneArena(world);
         buildWreckageArena(world);
+        buildRingArena(world);
         world.setSpawnLocation(new Location(world, 0.5D, 97.0D, 0.5D, 180.0F, 0.0F));
     }
 
@@ -189,6 +206,7 @@ public final class DefaultMapBuilder {
         buildLobbyPillar(world, 7, 7);
 
         buildLobbyRailing(world);
+        buildLobbySafetyBarriers(world);
 
         fill(world, -1, 96, -6, 1, 96, -5, Material.SMOOTH_QUARTZ);
         set(world, 0, 97, -6, Material.OAK_SIGN);
@@ -249,6 +267,45 @@ public final class DefaultMapBuilder {
         buildShard(world, 192, 74, -6);
         buildShard(world, 187, 67, 10);
         buildShard(world, 196, 67, -14);
+    }
+
+    private static void buildRingArena(World world) {
+        buildRingMajorIsland(world, RING_CENTER_X, RING_PLATFORM_Y, -20, true);
+        buildRingMajorIsland(world, RING_CENTER_X + 20, RING_PLATFORM_Y, RING_CENTER_Z, false);
+        buildRingMajorIsland(world, RING_CENTER_X, RING_PLATFORM_Y, 20, true);
+        buildRingMajorIsland(world, RING_CENTER_X - 20, RING_PLATFORM_Y, RING_CENTER_Z, false);
+
+        buildRingConnectorNode(world, RING_CENTER_X + 14, RING_PLATFORM_Y, -14);
+        buildRingConnectorNode(world, RING_CENTER_X + 14, RING_PLATFORM_Y, 14);
+        buildRingConnectorNode(world, RING_CENTER_X - 14, RING_PLATFORM_Y, 14);
+        buildRingConnectorNode(world, RING_CENTER_X - 14, RING_PLATFORM_Y, -14);
+
+        buildRingInwardSpur(world, RING_CENTER_X, RING_PLATFORM_Y, -13);
+        buildRingInwardSpur(world, RING_CENTER_X + 13, RING_PLATFORM_Y, RING_CENTER_Z);
+        buildRingInwardSpur(world, RING_CENTER_X, RING_PLATFORM_Y, 13);
+        buildRingInwardSpur(world, RING_CENTER_X - 13, RING_PLATFORM_Y, RING_CENTER_Z);
+        buildRingInwardSpur(world, RING_CENTER_X + 10, RING_PLATFORM_Y, -10);
+        buildRingInwardSpur(world, RING_CENTER_X + 10, RING_PLATFORM_Y, 10);
+        buildRingInwardSpur(world, RING_CENTER_X - 10, RING_PLATFORM_Y, 10);
+        buildRingInwardSpur(world, RING_CENTER_X - 10, RING_PLATFORM_Y, -10);
+
+        buildRingBridge(world, RING_CENTER_X, RING_PLATFORM_Y, -20, RING_CENTER_X + 14, -14);
+        buildRingBridge(world, RING_CENTER_X + 14, RING_PLATFORM_Y, -14, RING_CENTER_X + 20, 0);
+        buildRingBridge(world, RING_CENTER_X + 20, RING_PLATFORM_Y, 0, RING_CENTER_X + 14, 14);
+        buildRingBridge(world, RING_CENTER_X + 14, RING_PLATFORM_Y, 14, RING_CENTER_X, 20);
+        buildRingBridge(world, RING_CENTER_X, RING_PLATFORM_Y, 20, RING_CENTER_X - 14, 14);
+        buildRingBridge(world, RING_CENTER_X - 14, RING_PLATFORM_Y, 14, RING_CENTER_X - 20, 0);
+        buildRingBridge(world, RING_CENTER_X - 20, RING_PLATFORM_Y, 0, RING_CENTER_X - 14, -14);
+        buildRingBridge(world, RING_CENTER_X - 14, RING_PLATFORM_Y, -14, RING_CENTER_X, -20);
+
+        buildRingDebris(world, RING_CENTER_X, 68, -31);
+        buildRingDebris(world, RING_CENTER_X + 31, 68, RING_CENTER_Z);
+        buildRingDebris(world, RING_CENTER_X, 68, 31);
+        buildRingDebris(world, RING_CENTER_X - 31, 68, RING_CENTER_Z);
+        buildRingDebris(world, RING_CENTER_X + 24, 66, -24);
+        buildRingDebris(world, RING_CENTER_X + 24, 66, 24);
+        buildRingDebris(world, RING_CENTER_X - 24, 66, 24);
+        buildRingDebris(world, RING_CENTER_X - 24, 66, -24);
     }
 
     private static void buildPillar(World world, int x, int fromY, int z, int toY) {
@@ -330,6 +387,76 @@ public final class DefaultMapBuilder {
         set(world, x, 101, z, Material.SEA_LANTERN);
     }
 
+    private static void buildRingMajorIsland(World world, int centerX, int y, int centerZ, boolean horizontal) {
+        int radiusX = horizontal ? 7 : 5;
+        int radiusZ = horizontal ? 5 : 7;
+        buildPaletteOval(world, centerX, y, centerZ, radiusX, radiusZ, RING_SURFACE);
+        buildPaletteOval(world, centerX, y - 1, centerZ, Math.max(3, radiusX - 1), Math.max(3, radiusZ - 1), RING_FILL);
+        buildPaletteOval(world, centerX, y - 2, centerZ, Math.max(2, radiusX - 3), Math.max(2, radiusZ - 3), RING_FILL);
+
+        if (horizontal) {
+            buildRingSupport(world, centerX - 4, y - 3, centerZ);
+            buildRingSupport(world, centerX, y - 3, centerZ);
+            buildRingSupport(world, centerX + 4, y - 3, centerZ);
+            set(world, centerX - 5, y, centerZ, Material.SEA_LANTERN);
+            set(world, centerX + 5, y, centerZ, Material.SEA_LANTERN);
+            set(world, centerX, y, centerZ - 3, Material.SEA_LANTERN);
+            set(world, centerX, y, centerZ + 3, Material.SEA_LANTERN);
+        } else {
+            buildRingSupport(world, centerX, y - 3, centerZ - 4);
+            buildRingSupport(world, centerX, y - 3, centerZ);
+            buildRingSupport(world, centerX, y - 3, centerZ + 4);
+            set(world, centerX, y, centerZ - 5, Material.SEA_LANTERN);
+            set(world, centerX, y, centerZ + 5, Material.SEA_LANTERN);
+            set(world, centerX - 3, y, centerZ, Material.SEA_LANTERN);
+            set(world, centerX + 3, y, centerZ, Material.SEA_LANTERN);
+        }
+    }
+
+    private static void buildRingConnectorNode(World world, int centerX, int y, int centerZ) {
+        buildPaletteOval(world, centerX, y, centerZ, 4, 4, RING_SURFACE);
+        buildPaletteOval(world, centerX, y - 1, centerZ, 3, 3, RING_FILL);
+        buildPaletteOval(world, centerX, y - 2, centerZ, 2, 2, RING_FILL);
+        buildRingSupport(world, centerX, y - 3, centerZ);
+        set(world, centerX - 2, y, centerZ, Material.SEA_LANTERN);
+        set(world, centerX + 2, y, centerZ, Material.SEA_LANTERN);
+    }
+
+    private static void buildRingInwardSpur(World world, int centerX, int y, int centerZ) {
+        buildPaletteOval(world, centerX, y, centerZ, 2, 2, RING_SURFACE);
+        buildPaletteOval(world, centerX, y - 1, centerZ, 1, 1, RING_FILL);
+        buildRingSupport(world, centerX, y - 2, centerZ);
+    }
+
+    private static void buildRingBridge(World world, int startX, int y, int startZ, int endX, int endZ) {
+        int steps = Math.max(Math.abs(endX - startX), Math.abs(endZ - startZ)) * 3;
+        for (int step = 0; step <= steps; step++) {
+            double progress = steps == 0 ? 0.0D : step / (double) steps;
+            int x = (int) Math.round(startX + ((endX - startX) * progress));
+            int z = (int) Math.round(startZ + ((endZ - startZ) * progress));
+
+            buildPaletteRoundPlatform(world, x, y, z, 1, RING_SURFACE);
+            set(world, x, y - 1, z, pickMaterial(RING_FILL, x, y - 1, z));
+            if (step % 4 == 0) {
+                buildRingSupport(world, x, y - 2, z);
+            }
+        }
+    }
+
+    private static void buildRingDebris(World world, int centerX, int y, int centerZ) {
+        buildPaletteRoundPlatform(world, centerX, y, centerZ, 2, RING_SURFACE);
+        set(world, centerX, y - 1, centerZ, pickMaterial(RING_FILL, centerX, y - 1, centerZ));
+        buildRingSupport(world, centerX, y - 2, centerZ);
+    }
+
+    private static void buildRingSupport(World world, int x, int fromY, int z) {
+        int baseY = 60;
+        if (fromY < baseY) {
+            return;
+        }
+        fill(world, x, baseY, z, x, fromY, z, pickMaterial(RING_FILL, x, baseY, z));
+    }
+
     private static void buildLobbyRailing(World world) {
         for (int x = -10; x <= 10; x++) {
             for (int z = -10; z <= 10; z++) {
@@ -347,6 +474,32 @@ public final class DefaultMapBuilder {
         }
     }
 
+    private static void buildLobbySafetyBarriers(World world) {
+        buildBarrierWall(world, -2, -10, -2, -5);
+        buildBarrierWall(world, 2, -10, 2, -5);
+        buildBarrierCap(world, -1, -11, 1, -11);
+
+        buildBarrierWall(world, -2, 7, -2, 10);
+        buildBarrierWall(world, 2, 7, 2, 10);
+        buildBarrierCap(world, -1, 11, 1, 11);
+
+        buildBarrierWall(world, -10, -2, -7, -2);
+        buildBarrierWall(world, -10, 2, -7, 2);
+        buildBarrierCap(world, -11, -1, -11, 1);
+
+        buildBarrierWall(world, 7, -2, 10, -2);
+        buildBarrierWall(world, 7, 2, 10, 2);
+        buildBarrierCap(world, 11, -1, 11, 1);
+    }
+
+    private static void buildBarrierWall(World world, int x1, int z1, int x2, int z2) {
+        fill(world, x1, 97, z1, x2, 98, z2, Material.BARRIER);
+    }
+
+    private static void buildBarrierCap(World world, int x1, int z1, int x2, int z2) {
+        fill(world, x1, 97, z1, x2, 98, z2, Material.BARRIER);
+    }
+
     private static void buildPattern(World world, int centerX, int y, int centerZ, String[] pattern, Material[] palette) {
         int startZ = centerZ - (pattern.length / 2);
         for (int row = 0; row < pattern.length; row++) {
@@ -359,6 +512,34 @@ public final class DefaultMapBuilder {
                 int x = startX + col;
                 int z = startZ + row;
                 set(world, x, y, z, pickMaterial(palette, x, y, z));
+            }
+        }
+    }
+
+    private static void buildPaletteOval(World world, int centerX, int y, int centerZ, int radiusX, int radiusZ, Material[] palette) {
+        double radiusXSquared = radiusX * radiusX;
+        double radiusZSquared = radiusZ * radiusZ;
+        for (int x = centerX - radiusX; x <= centerX + radiusX; x++) {
+            for (int z = centerZ - radiusZ; z <= centerZ + radiusZ; z++) {
+                int dx = x - centerX;
+                int dz = z - centerZ;
+                double normalizedDistance = (dx * dx) / radiusXSquared + (dz * dz) / radiusZSquared;
+                if (normalizedDistance <= 1.0D) {
+                    set(world, x, y, z, pickMaterial(palette, x, y, z));
+                }
+            }
+        }
+    }
+
+    private static void buildPaletteRoundPlatform(World world, int centerX, int y, int centerZ, int radius, Material[] palette) {
+        int radiusSquared = radius * radius;
+        for (int x = centerX - radius; x <= centerX + radius; x++) {
+            for (int z = centerZ - radius; z <= centerZ + radius; z++) {
+                int dx = x - centerX;
+                int dz = z - centerZ;
+                if ((dx * dx) + (dz * dz) <= radiusSquared) {
+                    set(world, x, y, z, pickMaterial(palette, x, y, z));
+                }
             }
         }
     }

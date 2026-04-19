@@ -109,6 +109,69 @@ language:
   option_en: "&fEnglish"
   changed: "Язык изменён на &f{language}&7."
 
+host:
+  selector_name: "&6Параметры игры"
+  selector_lore:
+    - "&7Только для хоста лобби."
+    - "&7Нажми, чтобы открыть меню"
+    - "&7настроек текущего сервера."
+  menu_title: "&6Параметры игры"
+  transfer_menu_title: "&6Передать хоста"
+  not_host: "&cТы больше не хост лобби."
+  assigned: "&aТы теперь хост лобби. Предмет в слоте &f5 &aоткроет параметры игры."
+  transfer_sent: "&aРоль хоста передана игроку &f{player}&a."
+  transfer_received: "&aИгрок &f{player} &aпередал тебе роль хоста."
+  transfer_target_unavailable: "&cЭтот игрок уже недоступен."
+  status_enabled: "&aВключено"
+  status_disabled: "&cВыключено"
+  click_toggle: "&eНажми, чтобы переключить"
+  click_cycle_map: "&eНажми, чтобы выбрать следующую карту"
+  sudden_night_name: "&bСудная Ночь"
+  sudden_night_lore:
+    - "&7Статус: {status}"
+    - "&7Включает ночную фазу"
+    - "&7во время матча."
+    - "{action}"
+  sudden_night_changed: "Судная Ночь: {status}"
+  rounds_minus_name: "&cРаундов до ресета: -1"
+  rounds_minus_lore:
+    - "&7Текущее значение: &f{value}"
+    - "&eНажми, чтобы уменьшить."
+  rounds_info_name: "&bРаундов до ресета"
+  rounds_info_lore:
+    - "&7Карта будет очищаться"
+    - "&7после &f{value} &7раундов."
+  rounds_plus_name: "&aРаундов до ресета: +1"
+  rounds_plus_lore:
+    - "&7Текущее значение: &f{value}"
+    - "&eНажми, чтобы увеличить."
+  rounds_changed: "Новое число раундов до ресета: &f{value}"
+  map_name: "&bВыбор карты"
+  map_lore:
+    - "&7Текущая карта: &f{map}"
+    - "{action}"
+  map_random: "&fСлучайная"
+  map_changed: "Выбрана карта: &f{map}"
+  autostart_name: "&bАвтостарт"
+  autostart_lore:
+    - "&7Статус: {status}"
+    - "&7Если выключить, игра не начнётся,"
+    - "&7пока хост не включит обратно."
+    - "{action}"
+  autostart_changed: "Автостарт: {status}"
+  transfer_name: "&bПередать роль хоста"
+  transfer_lore:
+    - "&7Открой список текущих игроков"
+    - "&7и передай роль другому."
+  transfer_target_name: "&fПередать: {player}"
+  transfer_target_lore:
+    - "&eНажми, чтобы передать"
+    - "&eроль хоста этому игроку."
+  transfer_empty_name: "&cНекому передавать"
+  transfer_empty_lore:
+    - "&7Сейчас на сервере"
+    - "&7нет других игроков."
+
 arena:
   already_here: "Ты уже на этой арене."
   full: "Арена заполнена."
@@ -140,6 +203,12 @@ arena:
   match_cancelled_left: "Матч отменён: часть игроков вышла."
   round_title: "Раунд: {current}/{max}"
   match_started: "&aМатч начался. &fРаунд {current}/{max}&a. Сбрось остальных вниз."
+  sudden_night_started: "&4Судная ночь началась. &7На арене наступила ночь."
+  sudden_night_title: "&4Судная ночь"
+  sudden_night_subtitle: "&7Через тьму будет сложнее выжить."
+  sudden_night_ended: "&eСудная ночь закончилась. &7На арену вернулся день."
+  day_returns_title: "&eСнова день"
+  day_returns_subtitle: "&7Судная ночь отступила."
   no_winner: "Матч завершился без победителя."
   match_finished: "&fМатч завершён"
   winner: "&aПобедитель: &f{player}"
