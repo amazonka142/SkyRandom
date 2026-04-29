@@ -61,8 +61,11 @@ public final class GameManager {
     private static final long COMBAT_TAG_MILLIS = 15_000L;
     private static final long DEFAULT_WORLD_DAY_TIME = 6_000L;
     private static final long DEFAULT_WORLD_NIGHT_TIME = 18_000L;
-    private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 300;
+    private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 180;
     private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
+    private static final int DROP_INTERVAL_FAST_TICKS = 60;
+    private static final int DROP_INTERVAL_CLASSIC_TICKS = 100;
+    private static final int DROP_INTERVAL_SLOW_TICKS = 200;
     private static final String DEFAULT_VOID_WORLD_NAME = "skyrandom_void";
     private static final String SAFE_DEMO_WORLD_PREFIX = "skyrandom_";
     private static final String ABOUT_AUTHOR = "amazonka142 (vkkooz)";
@@ -86,6 +89,11 @@ public final class GameManager {
     private final NamespacedKey menuBackItemKey;
     private final NamespacedKey lobbyHostItemKey;
     private final NamespacedKey hostMenuToggleSuddenNightItemKey;
+    private final NamespacedKey hostMenuOpenSubmenuItemKey;
+    private final NamespacedKey hostMenuToggleSuddenNightAlwaysItemKey;
+    private final NamespacedKey hostMenuSuddenNightDelayAdjustItemKey;
+    private final NamespacedKey hostMenuDropIntervalItemKey;
+    private final NamespacedKey hostMenuArenaSelectItemKey;
     private final NamespacedKey hostMenuRoundsAdjustItemKey;
     private final NamespacedKey hostMenuArenaCycleItemKey;
     private final NamespacedKey hostMenuAutostartItemKey;
@@ -101,6 +109,7 @@ public final class GameManager {
     private boolean dedicatedServerMode = true;
     private boolean soloTestMode = true;
     private boolean suddenNightEnabled = true;
+    private boolean suddenNightAlways = false;
     private String defaultArenaId = "random";
     private int lobbyProtectionRadius = 12;
     private int lobbyProtectionBelow = 14;
@@ -110,6 +119,7 @@ public final class GameManager {
     private int suddenNightDurationSeconds = DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
     private boolean lobbyAutostartEnabled = true;
     private int lobbyRoundsBeforeReset = 10;
+    private int lobbyDropIntervalTicks = DROP_INTERVAL_CLASSIC_TICKS;
     private UUID lobbyHostId;
     private final Map<UUID, Long> lobbyHostJoinOrder = new HashMap<>();
     private long nextLobbyJoinOrder = 1L;
@@ -128,6 +138,11 @@ public final class GameManager {
         this.menuBackItemKey = new NamespacedKey(plugin, "menu_back_item");
         this.lobbyHostItemKey = new NamespacedKey(plugin, "lobby_host_item");
         this.hostMenuToggleSuddenNightItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night");
+        this.hostMenuOpenSubmenuItemKey = new NamespacedKey(plugin, "host_menu_open_submenu");
+        this.hostMenuToggleSuddenNightAlwaysItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_always");
+        this.hostMenuSuddenNightDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_sudden_night_delay_adjust");
+        this.hostMenuDropIntervalItemKey = new NamespacedKey(plugin, "host_menu_drop_interval");
+        this.hostMenuArenaSelectItemKey = new NamespacedKey(plugin, "host_menu_arena_select");
         this.hostMenuRoundsAdjustItemKey = new NamespacedKey(plugin, "host_menu_rounds_adjust");
         this.hostMenuArenaCycleItemKey = new NamespacedKey(plugin, "host_menu_arena_cycle");
         this.hostMenuAutostartItemKey = new NamespacedKey(plugin, "host_menu_autostart");
@@ -147,6 +162,7 @@ public final class GameManager {
         this.dedicatedServerMode = settings == null || settings.getBoolean("dedicated-server-mode", true);
         this.soloTestMode = settings == null || settings.getBoolean("solo-test-mode", true);
         this.suddenNightEnabled = settings == null || settings.getBoolean("sudden-night-enabled", true);
+        this.suddenNightAlways = settings != null && settings.getBoolean("sudden-night-always", false);
         this.defaultArenaId = settings != null ? settings.getString("default-arena", "random") : "random";
         this.lobbyProtectionRadius = settings != null ? Math.max(1, settings.getInt("lobby-protection-radius", 12)) : 12;
         this.lobbyProtectionBelow = settings != null ? Math.max(0, settings.getInt("lobby-protection-below", 14)) : 14;
@@ -173,7 +189,8 @@ public final class GameManager {
         }
 
         int globalCountdown = settings != null ? settings.getInt("countdown-seconds", 15) : 15;
-        int globalDropInterval = settings != null ? settings.getInt("drop-interval-ticks", 50) : 50;
+        int globalDropInterval = settings != null ? settings.getInt("drop-interval-ticks", DROP_INTERVAL_CLASSIC_TICKS) : DROP_INTERVAL_CLASSIC_TICKS;
+        this.lobbyDropIntervalTicks = Math.max(1, globalDropInterval);
         int globalWinDelay = settings != null ? settings.getInt("win-delay-seconds", 0) : 0;
         int globalResetWinDelay = settings != null ? settings.getInt("reset-win-delay-seconds", 20) : 20;
         double globalMinY = settings != null ? settings.getDouble("eliminate-below-y", 55.0D) : 55.0D;
@@ -626,24 +643,47 @@ public final class GameManager {
         currentArena.transferQueuedPlayersTo(nextArena, playersToMove);
     }
 
-    public void startSuddenNightSession(Arena arena) {
+    public boolean startSuddenNightSession(Arena arena) {
         if (!suddenNightEnabled || arena == null || arena.getWorld() == null) {
-            return;
+            return false;
         }
 
         UUID worldId = arena.getWorld().getUID();
+        // One world can be reused by different arenas, so keep one shared sudden-night state per world.
         SuddenNightWorldState state = suddenNightStates.computeIfAbsent(worldId, ignored -> new SuddenNightWorldState(arena.getWorld()));
         state.activeSessions++;
-        if (state.activeSessions > 1 || state.completedCycle || state.startTask != null || state.nightTask != null) {
-            return;
+        if (suddenNightAlways) {
+            if (state.completedCycle) {
+                return true;
+            }
+            if (state.startTask != null) {
+                state.startTask.cancel();
+                state.startTask = null;
+            }
+            if (state.nightTask != null) {
+                state.nightTask.cancel();
+                state.nightTask = null;
+            }
+            state.completedCycle = true;
+            state.world.setTime(DEFAULT_WORLD_NIGHT_TIME);
+            state.world.setStorm(false);
+            announceSuddenNight(state.world, true);
+            return true;
         }
 
+        // If the cycle is already running for this world, do not schedule it again.
+        if (state.activeSessions > 1 || state.completedCycle || state.startTask != null || state.nightTask != null) {
+            return true;
+        }
+
+        // Start from daytime, then switch later.
         resetWorldToDay(state.world);
         state.startTask = plugin.getServer().getScheduler().runTaskLater(
             plugin,
             () -> startSuddenNight(worldId),
             suddenNightDelaySeconds * 20L
         );
+        return true;
     }
 
     public void endSuddenNightSession(Arena arena) {
@@ -870,7 +910,7 @@ public final class GameManager {
             return false;
         }
         SuddenNightWorldState state = suddenNightStates.get(world.getUID());
-        return state != null && state.nightTask != null;
+        return state != null && (state.nightTask != null || (suddenNightAlways && state.completedCycle && state.activeSessions > 0));
     }
 
     private void cancelSuddenNightState(SuddenNightWorldState state, boolean resetDay) {
@@ -1083,17 +1123,76 @@ public final class GameManager {
             return;
         }
 
-        HostMenuHolder holder = new HostMenuHolder();
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.MAIN);
         Inventory inventory = Bukkit.createInventory(holder, 45, tr(player, "host.menu_title"));
         holder.setInventory(inventory);
-        inventory.setItem(10, createHostSuddenNightItem(player));
+        inventory.setItem(10, createHostMapMenuItem(player));
         inventory.setItem(12, createHostRoundsAdjustItem(player, -1));
         inventory.setItem(13, createHostRoundsDisplayItem(player));
         inventory.setItem(14, createHostRoundsAdjustItem(player, 1));
-        inventory.setItem(16, createHostArenaCycleItem(player));
-        inventory.setItem(28, createHostAutostartItem(player));
+        inventory.setItem(28, createHostSuddenNightMenuItem(player));
+        inventory.setItem(30, createHostGameSpeedMenuItem(player));
+        inventory.setItem(32, createHostAutostartItem(player));
         inventory.setItem(31, createHostTransferItem(player));
         inventory.setItem(40, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void openHostSuddenNightMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.SUDDEN_NIGHT);
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.sudden_night_menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(10, createHostSuddenNightToggleItem(player));
+        inventory.setItem(12, createHostSuddenNightDelayAdjustItem(player, -1));
+        inventory.setItem(13, createHostSuddenNightDelayDisplayItem(player));
+        inventory.setItem(14, createHostSuddenNightDelayAdjustItem(player, 1));
+        inventory.setItem(16, createHostSuddenNightAlwaysItem(player));
+        inventory.setItem(22, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void openHostGameSpeedMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.GAME_SPEED);
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.speed_menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(11, createHostDropIntervalItem(player, DROP_INTERVAL_FAST_TICKS, "host.speed_fast_name"));
+        inventory.setItem(13, createHostDropIntervalItem(player, DROP_INTERVAL_CLASSIC_TICKS, "host.speed_classic_name"));
+        inventory.setItem(15, createHostDropIntervalItem(player, DROP_INTERVAL_SLOW_TICKS, "host.speed_slow_name"));
+        inventory.setItem(22, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void openHostMapSelectionMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.MAP_SELECTION);
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.map_menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(10, createHostMapSelectionItem(player, null));
+
+        int slot = 11;
+        for (Arena arena : arenas.values()) {
+            if (slot >= 17) {
+                break;
+            }
+            inventory.setItem(slot, createHostMapSelectionItem(player, arena));
+            slot++;
+        }
+
+        inventory.setItem(22, createBackItem(player));
         player.openInventory(inventory);
     }
 
@@ -1107,11 +1206,14 @@ public final class GameManager {
         Inventory inventory = Bukkit.createInventory(holder, 54, tr(player, "host.transfer_menu_title"));
         holder.setInventory(inventory);
 
+        // Oldest lobby joins first.
+        // Bukkit gives ? extends Player here, so copy it into a plain List<Player>.
         List<Player> targets = new ArrayList<>(
             Bukkit.getOnlinePlayers().stream()
                 .filter(Player::isOnline)
                 .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
                 .sorted(
+                    // Name is just a stable fallback when join order matches.
                     Comparator.comparingLong((Player target) -> lobbyHostJoinOrder.getOrDefault(target.getUniqueId(), Long.MAX_VALUE))
                         .thenComparing(Player::getName, String.CASE_INSENSITIVE_ORDER)
                 )
@@ -1123,6 +1225,7 @@ public final class GameManager {
         } else {
             int slot = 0;
             for (Player target : targets) {
+                // Keep the last row free for controls.
                 if (slot >= 45) {
                     break;
                 }
@@ -1177,18 +1280,77 @@ public final class GameManager {
             return;
         }
 
+        HostMenuHolder.Section section = HostMenuHolder.Section.MAIN;
+        Inventory openInventory = player.getOpenInventory().getTopInventory();
+        if (openInventory != null && openInventory.getHolder() instanceof HostMenuHolder holder) {
+            section = holder.getSection();
+        }
+
         if (meta.getPersistentDataContainer().has(menuBackItemKey, PersistentDataType.BYTE)) {
-            player.closeInventory();
+            if (section == HostMenuHolder.Section.MAIN) {
+                player.closeInventory();
+            } else {
+                openHostMenu(player);
+            }
             return;
         }
+
+        String submenu = meta.getPersistentDataContainer().get(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING);
+        if (submenu != null) {
+            switch (submenu) {
+                case "sudden_night" -> openHostSuddenNightMenu(player);
+                case "game_speed" -> openHostGameSpeedMenu(player);
+                case "map_selection" -> openHostMapSelectionMenu(player);
+                default -> {
+                }
+            }
+            return;
+        }
+
+        // Menu actions are identified by metadata markers on the clicked item.
         if (meta.getPersistentDataContainer().has(hostMenuToggleSuddenNightItemKey, PersistentDataType.BYTE)) {
             suddenNightEnabled = !suddenNightEnabled;
             if (!suddenNightEnabled) {
                 clearSuddenNightStates();
                 enforceStaticDaylight();
             }
+            refreshSuddenNightSessions();
             sendLocalized(player, "host.sudden_night_changed", "status", getHostStatusText(player, suddenNightEnabled));
-            openHostMenu(player);
+            openHostSuddenNightMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuToggleSuddenNightAlwaysItemKey, PersistentDataType.BYTE)) {
+            suddenNightAlways = !suddenNightAlways;
+            refreshSuddenNightSessions();
+            sendLocalized(player, "host.sudden_night_always_changed", "status", getHostStatusText(player, suddenNightAlways));
+            openHostSuddenNightMenu(player);
+            return;
+        }
+
+        Integer suddenNightDelayDelta = meta.getPersistentDataContainer().get(hostMenuSuddenNightDelayAdjustItemKey, PersistentDataType.INTEGER);
+        if (suddenNightDelayDelta != null) {
+            int minutes = Math.max(1, getSuddenNightDelayMinutes() + suddenNightDelayDelta);
+            suddenNightDelaySeconds = minutes * 60;
+            refreshSuddenNightSessions();
+            sendLocalized(player, "host.sudden_night_delay_changed", "minutes", minutes);
+            openHostSuddenNightMenu(player);
+            return;
+        }
+
+        Integer dropIntervalTicks = meta.getPersistentDataContainer().get(hostMenuDropIntervalItemKey, PersistentDataType.INTEGER);
+        if (dropIntervalTicks != null) {
+            setLobbyDropIntervalTicks(dropIntervalTicks);
+            sendLocalized(player, "host.speed_changed", "speed", getDropIntervalDisplay(player, lobbyDropIntervalTicks));
+            openHostGameSpeedMenu(player);
+            return;
+        }
+
+        String selectedArenaId = meta.getPersistentDataContainer().get(hostMenuArenaSelectItemKey, PersistentDataType.STRING);
+        if (selectedArenaId != null) {
+            setLobbyArenaSelection(selectedArenaId);
+            sendLocalized(player, "host.map_changed", "map", getLobbyMapDisplay(player));
+            openHostMapSelectionMenu(player);
             return;
         }
 
@@ -1203,7 +1365,7 @@ public final class GameManager {
         if (meta.getPersistentDataContainer().has(hostMenuArenaCycleItemKey, PersistentDataType.BYTE)) {
             cycleLobbyArena();
             sendLocalized(player, "host.map_changed", "map", getLobbyMapDisplay(player));
-            openHostMenu(player);
+            openHostMapSelectionMenu(player);
             return;
         }
 
@@ -1238,6 +1400,7 @@ public final class GameManager {
             return;
         }
 
+        // Target player id is stored on the item itself.
         String rawTargetId = meta.getPersistentDataContainer().get(hostTransferTargetItemKey, PersistentDataType.STRING);
         if (rawTargetId == null || rawTargetId.isBlank()) {
             return;
@@ -1597,22 +1760,144 @@ public final class GameManager {
         return item;
     }
 
-    private ItemStack createHostSuddenNightItem(Player player) {
+    private ItemStack createHostSuddenNightMenuItem(Player player) {
         ItemStack item = new ItemStack(Material.DAYLIGHT_DETECTOR);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(tr(player, "host.sudden_night_name"));
+            meta.setDisplayName(tr(player, "host.sudden_night_settings_name"));
             meta.setLore(trList(
                 player,
-                "host.sudden_night_lore",
+                "host.sudden_night_settings_lore",
                 "status", getHostStatusText(player, suddenNightEnabled),
-                "action", tr(player, "host.click_toggle")
+                "mode", getSuddenNightModeDisplay(player),
+                "minutes", getSuddenNightDelayMinutes(),
+                "action", tr(player, "host.click_open")
             ));
-            meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightItemKey, PersistentDataType.BYTE, (byte) 1);
+            meta.getPersistentDataContainer().set(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING, "sudden_night");
             if (suddenNightEnabled) {
                 meta.addEnchant(Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostSuddenNightToggleItem(Player player) {
+        ItemStack item = new ItemStack(suddenNightEnabled ? Material.LIME_DYE : Material.GRAY_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.sudden_night_toggle_name"));
+            meta.setLore(trList(
+                player,
+                "host.sudden_night_toggle_lore",
+                "status", getHostStatusText(player, suddenNightEnabled),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightItemKey, PersistentDataType.BYTE, (byte) 1);
+            addSelectedGlow(meta, suddenNightEnabled);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostSuddenNightAlwaysItem(Player player) {
+        ItemStack item = new ItemStack(Material.NETHER_STAR);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.sudden_night_always_name"));
+            meta.setLore(trList(
+                player,
+                "host.sudden_night_always_lore",
+                "status", getHostStatusText(player, suddenNightAlways),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightAlwaysItemKey, PersistentDataType.BYTE, (byte) 1);
+            addSelectedGlow(meta, suddenNightAlways);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostSuddenNightDelayAdjustItem(Player player, int delta) {
+        ItemStack item = new ItemStack(delta > 0 ? Material.LIME_DYE : Material.RED_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, delta > 0 ? "host.sudden_night_delay_plus_name" : "host.sudden_night_delay_minus_name"));
+            meta.setLore(trList(
+                player,
+                delta > 0 ? "host.sudden_night_delay_plus_lore" : "host.sudden_night_delay_minus_lore",
+                "minutes", getSuddenNightDelayMinutes()
+            ));
+            meta.getPersistentDataContainer().set(hostMenuSuddenNightDelayAdjustItemKey, PersistentDataType.INTEGER, delta);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostSuddenNightDelayDisplayItem(Player player) {
+        ItemStack item = new ItemStack(Material.CLOCK);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.sudden_night_delay_name"));
+            meta.setLore(trList(
+                player,
+                "host.sudden_night_delay_lore",
+                "minutes", getSuddenNightDelayMinutes()
+            ));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostGameSpeedMenuItem(Player player) {
+        ItemStack item = new ItemStack(Material.SUGAR);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.speed_settings_name"));
+            meta.setLore(trList(
+                player,
+                "host.speed_settings_lore",
+                "speed", getDropIntervalDisplay(player, lobbyDropIntervalTicks),
+                "action", tr(player, "host.click_open")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING, "game_speed");
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostDropIntervalItem(Player player, int ticks, String nameKey) {
+        ItemStack item = new ItemStack(ticks == DROP_INTERVAL_FAST_TICKS ? Material.FEATHER : ticks == DROP_INTERVAL_SLOW_TICKS ? Material.HONEY_BLOCK : Material.CLOCK);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            boolean selected = lobbyDropIntervalTicks == ticks;
+            meta.setDisplayName(tr(player, nameKey));
+            meta.setLore(trList(
+                player,
+                "host.speed_option_lore",
+                "seconds", ticks / 20,
+                "status", selected ? tr(player, "host.selected") : tr(player, "host.not_selected")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuDropIntervalItemKey, PersistentDataType.INTEGER, ticks);
+            addSelectedGlow(meta, selected);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostMapMenuItem(Player player) {
+        ItemStack item = new ItemStack(Material.FILLED_MAP);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.map_name"));
+            meta.setLore(trList(
+                player,
+                "host.map_lore",
+                "map", getLobbyMapDisplay(player),
+                "action", tr(player, "host.click_open")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING, "map_selection");
             item.setItemMeta(meta);
         }
         return item;
@@ -1657,6 +1942,26 @@ public final class GameManager {
                 "action", tr(player, "host.click_cycle_map")
             ));
             meta.getPersistentDataContainer().set(hostMenuArenaCycleItemKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostMapSelectionItem(Player player, Arena arena) {
+        boolean random = arena == null;
+        boolean selected = random ? isRandomLobbyArenaSelected() : arena.getId().equalsIgnoreCase(defaultArenaId);
+        ItemStack item = new ItemStack(random ? Material.COMPASS : Material.FILLED_MAP);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            String mapName = random ? tr(player, "host.map_random") : arena.getDisplayName();
+            meta.setDisplayName(tr(player, random ? "host.map_random_option_name" : "host.map_option_name", "map", mapName));
+            meta.setLore(trList(
+                player,
+                "host.map_option_lore",
+                "status", selected ? tr(player, "host.selected") : tr(player, "host.not_selected")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuArenaSelectItemKey, PersistentDataType.STRING, random ? "random" : arena.getId());
+            addSelectedGlow(meta, selected);
             item.setItemMeta(meta);
         }
         return item;
@@ -1734,6 +2039,14 @@ public final class GameManager {
         return meta != null && meta.getPersistentDataContainer().has(menuBackItemKey, PersistentDataType.BYTE);
     }
 
+    private void addSelectedGlow(ItemMeta meta, boolean selected) {
+        if (!selected) {
+            return;
+        }
+        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+    }
+
     private ItemStack createBackItem(Player player) {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
@@ -1771,10 +2084,41 @@ public final class GameManager {
         return tr(player, enabled ? "host.status_enabled" : "host.status_disabled");
     }
 
+    private String getSuddenNightModeDisplay(Player player) {
+        if (suddenNightAlways) {
+            return tr(player, "host.sudden_night_mode_always");
+        }
+        return tr(player, "host.sudden_night_mode_after", "minutes", getSuddenNightDelayMinutes());
+    }
+
+    private int getSuddenNightDelayMinutes() {
+        return Math.max(1, (int) Math.ceil(suddenNightDelaySeconds / 60.0D));
+    }
+
+    private String getDropIntervalDisplay(Player player, int ticks) {
+        if (ticks == DROP_INTERVAL_FAST_TICKS) {
+            return tr(player, "host.speed_fast_name");
+        }
+        if (ticks == DROP_INTERVAL_SLOW_TICKS) {
+            return tr(player, "host.speed_slow_name");
+        }
+        if (ticks == DROP_INTERVAL_CLASSIC_TICKS) {
+            return tr(player, "host.speed_classic_name");
+        }
+        return tr(player, "host.speed_custom_name", "seconds", Math.max(1, ticks / 20));
+    }
+
     private void setLobbyRoundsBeforeReset(int roundsBeforeReset) {
         lobbyRoundsBeforeReset = Math.max(1, roundsBeforeReset);
         for (Arena arena : arenas.values()) {
             arena.setRoundsBeforeReset(lobbyRoundsBeforeReset);
+        }
+    }
+
+    private void setLobbyDropIntervalTicks(int dropIntervalTicks) {
+        lobbyDropIntervalTicks = Math.max(1, dropIntervalTicks);
+        for (Arena arena : arenas.values()) {
+            arena.setDropIntervalTicks(lobbyDropIntervalTicks);
         }
     }
 
@@ -1783,6 +2127,23 @@ public final class GameManager {
         for (Arena arena : arenas.values()) {
             arena.reevaluateCountdownState();
         }
+    }
+
+    private void setLobbyArenaSelection(String selectedArenaId) {
+        if (selectedArenaId == null || selectedArenaId.isBlank() || "random".equalsIgnoreCase(selectedArenaId)) {
+            defaultArenaId = "random";
+            setRandomQueuePreferenceForWaitingPlayers();
+            return;
+        }
+
+        Arena selectedArena = arenas.get(selectedArenaId.toLowerCase(Locale.ROOT));
+        if (selectedArena == null) {
+            return;
+        }
+
+        defaultArenaId = selectedArena.getId();
+        clearRandomQueuePreferenceForWaitingPlayers();
+        moveQueuedPlayersToSelectedArena(selectedArena);
     }
 
     private void cycleLobbyArena() {
@@ -1795,6 +2156,7 @@ public final class GameManager {
         if (isRandomLobbyArenaSelected()) {
             Arena selectedArena = arenaList.get(0);
             defaultArenaId = selectedArena.getId();
+            clearRandomQueuePreferenceForWaitingPlayers();
             moveQueuedPlayersToSelectedArena(selectedArena);
             return;
         }
@@ -1810,12 +2172,46 @@ public final class GameManager {
 
         if (currentIndex == -2 || currentIndex >= arenaList.size() - 1) {
             defaultArenaId = "random";
+            setRandomQueuePreferenceForWaitingPlayers();
             return;
         }
 
         Arena selectedArena = arenaList.get(currentIndex + 1);
         defaultArenaId = selectedArena.getId();
+        clearRandomQueuePreferenceForWaitingPlayers();
         moveQueuedPlayersToSelectedArena(selectedArena);
+    }
+
+    private void clearRandomQueuePreferenceForWaitingPlayers() {
+        for (Arena arena : arenas.values()) {
+            if (arena.getState() == GameState.RUNNING || arena.getState() == GameState.ENDING) {
+                continue;
+            }
+            for (UUID playerId : arena.getQueuedPlayersSnapshot()) {
+                randomQueuePlayers.remove(playerId);
+            }
+        }
+    }
+
+    private void setRandomQueuePreferenceForWaitingPlayers() {
+        for (Arena arena : arenas.values()) {
+            if (arena.getState() == GameState.RUNNING || arena.getState() == GameState.ENDING) {
+                continue;
+            }
+            for (UUID playerId : arena.getQueuedPlayersSnapshot()) {
+                randomQueuePlayers.add(playerId);
+            }
+        }
+    }
+
+    private void refreshSuddenNightSessions() {
+        clearSuddenNightStates();
+        for (Arena arena : arenas.values()) {
+            arena.restartSuddenNightSession();
+        }
+        if (!suddenNightEnabled) {
+            enforceStaticDaylight();
+        }
     }
 
     private Arena getSelectedLobbyArena() {

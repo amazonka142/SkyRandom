@@ -49,7 +49,7 @@ public final class Arena {
     private final int minPlayers;
     private final int maxPlayers;
     private final int countdownSeconds;
-    private final int dropIntervalTicks;
+    private int dropIntervalTicks;
     private final int winDelaySeconds;
     private final int resetWinDelaySeconds;
     private final double eliminateBelowY;
@@ -202,6 +202,23 @@ public final class Arena {
         updateSidebar();
     }
 
+    public void setDropIntervalTicks(int dropIntervalTicks) {
+        this.dropIntervalTicks = Math.max(1, dropIntervalTicks);
+        if (state == GameState.RUNNING && dropTask != null) {
+            ticksUntilNextDrop = Math.max(1, Math.min(ticksUntilNextDrop, this.dropIntervalTicks));
+            updateDropBar();
+        }
+        updateSidebar();
+    }
+
+    public void restartSuddenNightSession() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        suddenNightSessionActive = false;
+        beginSuddenNightSessionIfNeeded();
+    }
+
     public void reevaluateCountdownState() {
         evaluateCountdown();
     }
@@ -317,6 +334,7 @@ public final class Arena {
 
         removeUi(player);
         revealToArenaPlayers(player);
+        revealArenaPlayersTo(player);
         refreshVisibility();
         manager.unbindPlayer(player);
         manager.restorePlayer(player, waitingSpawn);
@@ -377,6 +395,10 @@ public final class Arena {
     }
 
     public void forceStart(CommandSender sender) {
+        if (state == GameState.RUNNING || state == GameState.ENDING) {
+            manager.sendLocalized(sender, "arena.force_start_already_running", "arena", displayName);
+            return;
+        }
         if (players.size() < minPlayers) {
             manager.sendLocalized(sender, "arena.force_start_not_enough", "arena", displayName);
             return;
@@ -1117,6 +1139,19 @@ public final class Arena {
         }
     }
 
+    private void revealArenaPlayersTo(Player viewer) {
+        for (UUID targetId : players) {
+            if (viewer.getUniqueId().equals(targetId)) {
+                continue;
+            }
+
+            Player target = Bukkit.getPlayer(targetId);
+            if (target != null && target.isOnline()) {
+                viewer.showPlayer(manager.getPlugin(), target);
+            }
+        }
+    }
+
     private Location getSpectatorLocation(Location source) {
         if (source != null && isWorld(source.getWorld()) && source.getY() >= eliminateBelowY) {
             return source.clone().add(0.0D, 1.0D, 0.0D);
@@ -1131,8 +1166,7 @@ public final class Arena {
         if (suddenNightSessionActive) {
             return;
         }
-        manager.startSuddenNightSession(this);
-        suddenNightSessionActive = true;
+        suddenNightSessionActive = manager.startSuddenNightSession(this);
     }
 
     private void endSuddenNightSessionIfNeeded() {

@@ -5,7 +5,27 @@ import org.bukkit.inventory.InventoryHolder;
 
 public final class HostMenuHolder implements InventoryHolder {
 
+    public enum Section {
+        MAIN,
+        SUDDEN_NIGHT,
+        GAME_SPEED,
+        MAP_SELECTION
+    }
+
+    private final Section section;
     private Inventory inventory;
+
+    public HostMenuHolder() {
+        this(Section.MAIN);
+    }
+
+    public HostMenuHolder(Section section) {
+        this.section = section == null ? Section.MAIN : section;
+    }
+
+    public Section getSection() {
+        return section;
+    }
 
     public void setInventory(Inventory inventory) {
         this.inventory = inventory;

@@ -460,44 +460,48 @@ public final class DefaultMapBuilder {
     private static void buildLobbyRailing(World world) {
         for (int x = -10; x <= 10; x++) {
             for (int z = -10; z <= 10; z++) {
-                int distance = (x * x) + (z * z);
-                boolean edge = distance >= 74 && distance <= 104;
-                boolean openNorth = Math.abs(x) <= 1 && z <= -7;
-                boolean openSouth = Math.abs(x) <= 1 && z >= 7;
-                boolean openWest = Math.abs(z) <= 1 && x <= -7;
-                boolean openEast = Math.abs(z) <= 1 && x >= 7;
-                if (!edge || openNorth || openSouth || openWest || openEast) {
+                if (!isLobbyRailingBlock(x, z)) {
                     continue;
                 }
-                set(world, x, 97, z, Material.WHITE_STAINED_GLASS_PANE);
+                set(world, x, 97, z, Material.WHITE_STAINED_GLASS);
             }
         }
     }
 
     private static void buildLobbySafetyBarriers(World world) {
-        buildBarrierWall(world, -2, -10, -2, -5);
-        buildBarrierWall(world, 2, -10, 2, -5);
-        buildBarrierCap(world, -1, -11, 1, -11);
+        for (int x = -10; x <= 10; x++) {
+            for (int z = -10; z <= 10; z++) {
+                if (isLobbyEdgeBarrierBlock(x, z)) {
+                    int fromY = isLobbyRailingBlock(x, z) ? 98 : 97;
+                    fill(world, x, fromY, z, x, 99, z, Material.BARRIER);
+                }
+            }
+        }
 
-        buildBarrierWall(world, -2, 7, -2, 10);
-        buildBarrierWall(world, 2, 7, 2, 10);
-        buildBarrierCap(world, -1, 11, 1, 11);
-
-        buildBarrierWall(world, -10, -2, -7, -2);
-        buildBarrierWall(world, -10, 2, -7, 2);
-        buildBarrierCap(world, -11, -1, -11, 1);
-
-        buildBarrierWall(world, 7, -2, 10, -2);
-        buildBarrierWall(world, 7, 2, 10, 2);
-        buildBarrierCap(world, 11, -1, 11, 1);
+        fill(world, -11, 97, -11, 11, 98, -11, Material.BARRIER);
+        fill(world, -11, 97, 11, 11, 98, 11, Material.BARRIER);
+        fill(world, -11, 97, -10, -11, 98, 10, Material.BARRIER);
+        fill(world, 11, 97, -10, 11, 98, 10, Material.BARRIER);
     }
 
-    private static void buildBarrierWall(World world, int x1, int z1, int x2, int z2) {
-        fill(world, x1, 97, z1, x2, 98, z2, Material.BARRIER);
+    private static boolean isLobbyRailingBlock(int x, int z) {
+        int distance = (x * x) + (z * z);
+        boolean edge = distance >= 74 && distance <= 104;
+        boolean openNorth = Math.abs(x) <= 1 && z <= -7;
+        boolean openSouth = Math.abs(x) <= 1 && z >= 7;
+        boolean openWest = Math.abs(z) <= 1 && x <= -7;
+        boolean openEast = Math.abs(z) <= 1 && x >= 7;
+        return edge && !openNorth && !openSouth && !openWest && !openEast;
     }
 
-    private static void buildBarrierCap(World world, int x1, int z1, int x2, int z2) {
-        fill(world, x1, 97, z1, x2, 98, z2, Material.BARRIER);
+    private static boolean isLobbyEdgeBarrierBlock(int x, int z) {
+        int distance = (x * x) + (z * z);
+        boolean edgeShell = distance >= 74 && distance <= 130;
+        boolean openNorth = Math.abs(x) <= 1 && z <= -7;
+        boolean openSouth = Math.abs(x) <= 1 && z >= 7;
+        boolean openWest = Math.abs(z) <= 1 && x <= -7;
+        boolean openEast = Math.abs(z) <= 1 && x >= 7;
+        return edgeShell && !openNorth && !openSouth && !openWest && !openEast;
     }
 
     private static void buildPattern(World world, int centerX, int y, int centerZ, String[] pattern, Material[] palette) {

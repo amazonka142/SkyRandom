@@ -96,8 +96,8 @@ public final class GameListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamageByEntity(EntityDamageByEntityEvent event) {
         Player attacker = resolveAttacker(event.getDamager());
+        Arena attackerArena = attacker == null ? null : gameManager.getArena(attacker);
         if (attacker != null) {
-            Arena attackerArena = gameManager.getArena(attacker);
             if (attackerArena != null && !attackerArena.isActivePlayer(attacker)) {
                 event.setCancelled(true);
                 return;
@@ -113,9 +113,16 @@ public final class GameListener implements Listener {
             return;
         }
 
-        if (attacker != null && gameManager.getArena(attacker) == arena && arena.isActivePlayer(attacker)) {
-            gameManager.recordPlayerAttack(victim, attacker);
+        if (attacker == null) {
+            return;
         }
+
+        if (attackerArena != arena || !arena.isActivePlayer(attacker)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        gameManager.recordPlayerAttack(victim, attacker);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

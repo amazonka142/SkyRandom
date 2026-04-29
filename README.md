@@ -6,7 +6,7 @@ Players join a lobby, get sent into a random arena, and fight through multiple r
 
 ## Latest Version
 
-`1.0.0-beta.5`
+`1.0.0-rc.1`
 
 ## How Matches Work
 
