@@ -218,6 +218,14 @@ host:
     - "&7until the host enables it again."
     - "{action}"
   autostart_changed: "Autostart: {status}"
+  defaults_name: "&eReset to Defaults"
+  defaults_lore:
+    - "&7Resets game settings:"
+    - "&fRandom map, 10 rounds"
+    - "&fSudden Night after 3 min."
+    - "&f5 sec. speed, autostart on."
+    - "&eClick to reset."
+  defaults_changed: "&aGame settings were reset to defaults."
   transfer_name: "&bTransfer Host Role"
   transfer_lore:
     - "&7Open the current player list"

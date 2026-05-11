@@ -25,8 +25,11 @@ val buildDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z")
 
 fun composePluginVersion(): String {
     val baseVersion = "$majorVersion.$minorVersion.$patchVersion"
+    if (releaseStage.isBlank()) {
+        return baseVersion
+    }
+
     val stageSuffix = when {
-        releaseStage.isBlank() -> ""
         releaseStageNumber.isBlank() -> "-$releaseStage"
         else -> "-$releaseStage.$releaseStageNumber"
     }

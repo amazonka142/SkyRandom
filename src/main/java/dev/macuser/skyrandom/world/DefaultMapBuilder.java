@@ -209,7 +209,6 @@ public final class DefaultMapBuilder {
         buildLobbySafetyBarriers(world);
 
         fill(world, -1, 96, -6, 1, 96, -5, Material.SMOOTH_QUARTZ);
-        set(world, 0, 97, -6, Material.OAK_SIGN);
     }
 
     private static void buildPillarsArena(World world) {

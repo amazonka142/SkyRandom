@@ -215,7 +215,7 @@ public final class Arena {
         if (state != GameState.RUNNING) {
             return;
         }
-        suddenNightSessionActive = false;
+        endSuddenNightSessionIfNeeded();
         beginSuddenNightSessionIfNeeded();
     }
 
@@ -704,6 +704,7 @@ public final class Arena {
             return;
         }
 
+        endSuddenNightSessionIfNeeded();
         state = GameState.RUNNING;
         activePlayers.clear();
         spectators.clear();
@@ -815,6 +816,7 @@ public final class Arena {
             dropTask.cancel();
             dropTask = null;
         }
+        endSuddenNightSessionIfNeeded();
         updateBarsAppearance(BarColor.PURPLE, 1.0D, null, false);
 
         if (activePlayers.isEmpty()) {
@@ -875,6 +877,7 @@ public final class Arena {
     }
 
     private void finishRound() {
+        endSuddenNightSessionIfNeeded();
         boolean reachedResetRound = currentRound >= roundsBeforeReset;
         if (reachedResetRound) {
             restoreArenaRegion();

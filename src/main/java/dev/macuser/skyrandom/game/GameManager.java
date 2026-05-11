@@ -63,6 +63,8 @@ public final class GameManager {
     private static final long DEFAULT_WORLD_NIGHT_TIME = 18_000L;
     private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 180;
     private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
+    private static final int DEFAULT_LOBBY_ROUNDS_BEFORE_RESET = 10;
+    private static final String DEFAULT_LOBBY_ARENA_ID = "random";
     private static final int DROP_INTERVAL_FAST_TICKS = 60;
     private static final int DROP_INTERVAL_CLASSIC_TICKS = 100;
     private static final int DROP_INTERVAL_SLOW_TICKS = 200;
@@ -97,6 +99,7 @@ public final class GameManager {
     private final NamespacedKey hostMenuRoundsAdjustItemKey;
     private final NamespacedKey hostMenuArenaCycleItemKey;
     private final NamespacedKey hostMenuAutostartItemKey;
+    private final NamespacedKey hostMenuResetDefaultsItemKey;
     private final NamespacedKey hostMenuTransferItemKey;
     private final NamespacedKey hostTransferTargetItemKey;
 
@@ -118,7 +121,7 @@ public final class GameManager {
     private int suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
     private int suddenNightDurationSeconds = DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
     private boolean lobbyAutostartEnabled = true;
-    private int lobbyRoundsBeforeReset = 10;
+    private int lobbyRoundsBeforeReset = DEFAULT_LOBBY_ROUNDS_BEFORE_RESET;
     private int lobbyDropIntervalTicks = DROP_INTERVAL_CLASSIC_TICKS;
     private UUID lobbyHostId;
     private final Map<UUID, Long> lobbyHostJoinOrder = new HashMap<>();
@@ -146,6 +149,7 @@ public final class GameManager {
         this.hostMenuRoundsAdjustItemKey = new NamespacedKey(plugin, "host_menu_rounds_adjust");
         this.hostMenuArenaCycleItemKey = new NamespacedKey(plugin, "host_menu_arena_cycle");
         this.hostMenuAutostartItemKey = new NamespacedKey(plugin, "host_menu_autostart");
+        this.hostMenuResetDefaultsItemKey = new NamespacedKey(plugin, "host_menu_reset_defaults");
         this.hostMenuTransferItemKey = new NamespacedKey(plugin, "host_menu_transfer");
         this.hostTransferTargetItemKey = new NamespacedKey(plugin, "host_transfer_target");
     }
@@ -196,7 +200,7 @@ public final class GameManager {
         double globalMinY = settings != null ? settings.getDouble("eliminate-below-y", 55.0D) : 55.0D;
         int globalMaxBuildY = settings != null ? settings.getInt("max-build-y", 95) : 95;
         double globalDropHeightOffset = settings != null ? settings.getDouble("drop-height-offset", 5.0D) : 5.0D;
-        int globalRoundsBeforeReset = settings != null ? settings.getInt("rounds-before-reset", 10) : 10;
+        int globalRoundsBeforeReset = settings != null ? settings.getInt("rounds-before-reset", DEFAULT_LOBBY_ROUNDS_BEFORE_RESET) : DEFAULT_LOBBY_ROUNDS_BEFORE_RESET;
         int globalRoundStartFreezeTicks = settings != null ? settings.getInt("round-start-freeze-ticks", 40) : 40;
         boolean globalAllowPlace = settings == null || settings.getBoolean("allow-place-blocks", true);
         boolean globalAllowBreakMap = settings != null && settings.getBoolean("allow-break-map-blocks", false);
@@ -653,9 +657,7 @@ public final class GameManager {
         SuddenNightWorldState state = suddenNightStates.computeIfAbsent(worldId, ignored -> new SuddenNightWorldState(arena.getWorld()));
         state.activeSessions++;
         if (suddenNightAlways) {
-            if (state.completedCycle) {
-                return true;
-            }
+            boolean alreadyRunning = state.completedCycle && state.activeSessions > 1;
             if (state.startTask != null) {
                 state.startTask.cancel();
                 state.startTask = null;
@@ -667,7 +669,9 @@ public final class GameManager {
             state.completedCycle = true;
             state.world.setTime(DEFAULT_WORLD_NIGHT_TIME);
             state.world.setStorm(false);
-            announceSuddenNight(state.world, true);
+            if (!alreadyRunning) {
+                announceSuddenNight(state.world, true);
+            }
             return true;
         }
 
@@ -1134,6 +1138,7 @@ public final class GameManager {
         inventory.setItem(30, createHostGameSpeedMenuItem(player));
         inventory.setItem(32, createHostAutostartItem(player));
         inventory.setItem(31, createHostTransferItem(player));
+        inventory.setItem(42, createHostResetDefaultsItem(player));
         inventory.setItem(40, createBackItem(player));
         player.openInventory(inventory);
     }
@@ -1372,6 +1377,13 @@ public final class GameManager {
         if (meta.getPersistentDataContainer().has(hostMenuAutostartItemKey, PersistentDataType.BYTE)) {
             setLobbyAutostartEnabled(!lobbyAutostartEnabled);
             sendLocalized(player, "host.autostart_changed", "status", getHostStatusText(player, lobbyAutostartEnabled));
+            openHostMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuResetDefaultsItemKey, PersistentDataType.BYTE)) {
+            resetLobbyHostSettingsToDefaults();
+            sendLocalized(player, "host.defaults_changed");
             openHostMenu(player);
             return;
         }
@@ -1988,6 +2000,18 @@ public final class GameManager {
         return item;
     }
 
+    private ItemStack createHostResetDefaultsItem(Player player) {
+        ItemStack item = new ItemStack(Material.RECOVERY_COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.defaults_name"));
+            meta.setLore(trList(player, "host.defaults_lore"));
+            meta.getPersistentDataContainer().set(hostMenuResetDefaultsItemKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack createHostTransferItem(Player player) {
         ItemStack item = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta rawMeta = item.getItemMeta();
@@ -2127,6 +2151,17 @@ public final class GameManager {
         for (Arena arena : arenas.values()) {
             arena.reevaluateCountdownState();
         }
+    }
+
+    private void resetLobbyHostSettingsToDefaults() {
+        suddenNightEnabled = true;
+        suddenNightAlways = false;
+        suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
+        setLobbyRoundsBeforeReset(DEFAULT_LOBBY_ROUNDS_BEFORE_RESET);
+        setLobbyDropIntervalTicks(DROP_INTERVAL_CLASSIC_TICKS);
+        setLobbyAutostartEnabled(true);
+        setLobbyArenaSelection(DEFAULT_LOBBY_ARENA_ID);
+        refreshSuddenNightSessions();
     }
 
     private void setLobbyArenaSelection(String selectedArenaId) {
