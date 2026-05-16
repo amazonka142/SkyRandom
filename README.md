@@ -6,7 +6,7 @@ Players join a lobby, get sent into a random arena, and fight through multiple r
 
 ## Latest Version
 
-`1.0.0`
+`1.0.1`
 
 ## How Matches Work
 
@@ -42,4 +42,4 @@ Paper 26.1.1 and 26.1.2 were smoke-tested on Java 25.
 
 ## Release Status
 
-SkyRandom 1.0.0 is the first stable public release and is designed for small Paper servers and quick PvP matches.
+SkyRandom 1.0.1 is the latest stable public release and is designed for small Paper servers and quick PvP matches.

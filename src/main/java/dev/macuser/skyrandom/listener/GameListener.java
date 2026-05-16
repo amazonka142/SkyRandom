@@ -189,6 +189,11 @@ public final class GameListener implements Listener {
             return;
         }
 
+        if (gameManager.isSpectatorTeleportItem(event.getItem())) {
+            gameManager.openSpectatorTeleportMenu(player);
+            return;
+        }
+
         if (gameManager.isSpectatorExitItem(event.getItem())) {
             arena.leave(player, "reason.spectator_leave");
         }
@@ -245,6 +250,14 @@ public final class GameListener implements Listener {
                 return;
             }
 
+            if (gameManager.isSpectatorTeleportMenu(event.getView().getTopInventory())) {
+                event.setCancelled(true);
+                if (event.getClickedInventory() == event.getView().getTopInventory()) {
+                    gameManager.handleSpectatorTeleportMenuClick(player, event.getCurrentItem());
+                }
+                return;
+            }
+
             Arena arena = gameManager.getArena(player);
             if (arena != null && arena.isSpectator(player)) {
                 event.setCancelled(true);
@@ -258,6 +271,7 @@ public final class GameListener implements Listener {
         Arena arena = gameManager.getArena(player);
         if ((arena != null && arena.isSpectator(player))
             || gameManager.isLanguageSelectorItem(event.getItemDrop().getItemStack())
+            || gameManager.isSpectatorTeleportItem(event.getItemDrop().getItemStack())
             || gameManager.isLobbyHostItem(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }

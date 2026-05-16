@@ -38,6 +38,7 @@ public final class Arena {
     private static final String ALIVE_ENTRY = ChatColor.BLUE.toString();
     private static final String DROP_ENTRY = ChatColor.GREEN.toString();
     private static final String CLEANUP_ENTRY = ChatColor.GOLD.toString();
+    private static final int DEFAULT_CLEANUP_BLOCKS_PER_TICK = 4096;
 
     private final GameManager manager;
     private final String id;
@@ -60,6 +61,7 @@ public final class Arena {
     private final boolean onlyBreakOwnPlacedBlocks;
     private int roundsBeforeReset;
     private final int roundStartFreezeTicks;
+    private final int cleanupBlocksPerTick;
     private final int minX;
     private final int maxX;
     private final int minY;
@@ -85,6 +87,7 @@ public final class Arena {
     private BukkitTask countdownTask;
     private BukkitTask dropTask;
     private BukkitTask finishTask;
+    private BukkitTask cleanupTask;
     private int countdownRemaining;
     private int ticksUntilNextDrop;
     private int intermissionRemaining;
@@ -115,6 +118,7 @@ public final class Arena {
         boolean onlyBreakOwnPlacedBlocks,
         int roundsBeforeReset,
         int roundStartFreezeTicks,
+        int cleanupBlocksPerTick,
         double playerBoundaryMargin,
         double playerMaxYMargin
     ) {
@@ -139,6 +143,7 @@ public final class Arena {
         this.onlyBreakOwnPlacedBlocks = onlyBreakOwnPlacedBlocks;
         this.roundsBeforeReset = Math.max(1, roundsBeforeReset);
         this.roundStartFreezeTicks = Math.max(0, roundStartFreezeTicks);
+        this.cleanupBlocksPerTick = Math.max(128, cleanupBlocksPerTick <= 0 ? DEFAULT_CLEANUP_BLOCKS_PER_TICK : cleanupBlocksPerTick);
         this.minX = (int) Math.floor(region.getMinX());
         this.maxX = (int) Math.floor(region.getMaxX());
         this.minY = (int) Math.floor(region.getMinY());
@@ -191,6 +196,10 @@ public final class Arena {
 
     public List<UUID> getQueuedPlayersSnapshot() {
         return List.copyOf(players);
+    }
+
+    public List<UUID> getActivePlayersSnapshot() {
+        return List.copyOf(activePlayers);
     }
 
     public int getRoundsBeforeReset() {
@@ -880,7 +889,15 @@ public final class Arena {
         endSuddenNightSessionIfNeeded();
         boolean reachedResetRound = currentRound >= roundsBeforeReset;
         if (reachedResetRound) {
-            restoreArenaRegion();
+            startArenaRegionCleanup(() -> completeRound(true));
+            return;
+        }
+
+        completeRound(false);
+    }
+
+    private void completeRound(boolean reachedResetRound) {
+        if (reachedResetRound) {
             currentRound = 0;
             broadcastLocalized("arena.cleanup_after", "rounds", roundsBeforeReset);
         }
@@ -915,7 +932,7 @@ public final class Arena {
         }
 
         if (players.isEmpty()) {
-            resetArena(true);
+            resetArena(!reachedResetRound);
             return;
         }
 
@@ -977,6 +994,10 @@ public final class Arena {
             finishTask.cancel();
             finishTask = null;
         }
+        if (cleanupTask != null) {
+            cleanupTask.cancel();
+            cleanupTask = null;
+        }
     }
 
     private void updateWaitingBar() {
@@ -1031,6 +1052,18 @@ public final class Arena {
             "bossbar.next_round",
             true,
             "seconds", intermissionRemaining
+        );
+        updateSidebar();
+    }
+
+    private void updateCleanupBar(double progress) {
+        int percent = (int) Math.round(Math.max(0.0D, Math.min(1.0D, progress)) * 100.0D);
+        updateBarsAppearance(
+            BarColor.WHITE,
+            Math.max(0.0D, Math.min(1.0D, progress)),
+            "bossbar.cleanup",
+            true,
+            "percent", percent
         );
         updateSidebar();
     }
@@ -1305,24 +1338,64 @@ public final class Arena {
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
-                    BlockKey key = new BlockKey(x, y, z);
-                    Block block = world.getBlockAt(x, y, z);
-                    String baselineData = baselineBlocks.get(key);
-                    if (baselineData == null) {
-                        if (!block.getType().isAir()) {
-                            block.setType(Material.AIR, false);
-                        }
-                        continue;
-                    }
-
-                    String currentData = block.getBlockData().getAsString();
-                    if (!baselineData.equals(currentData)) {
-                        block.setBlockData(Bukkit.createBlockData(baselineData), false);
-                    }
+                    restoreBlock(new BlockKey(x, y, z));
                 }
             }
         }
         placedBlocks.clear();
+    }
+
+    private void startArenaRegionCleanup(Runnable onComplete) {
+        if (cleanupTask != null) {
+            cleanupTask.cancel();
+            cleanupTask = null;
+        }
+
+        removeArenaEntities();
+        CleanupCursor cursor = new CleanupCursor(minX, maxX, minY, maxY, minZ, maxZ);
+        broadcastLocalized("arena.cleanup_started");
+        updateCleanupBar(0.0D);
+
+        cleanupTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
+            manager.getPlugin(),
+            () -> {
+                int processedThisTick = 0;
+                while (processedThisTick < cleanupBlocksPerTick && cursor.hasNext()) {
+                    restoreBlock(cursor.next());
+                    processedThisTick++;
+                }
+
+                updateCleanupBar(cursor.progress());
+                if (cursor.hasNext()) {
+                    return;
+                }
+
+                if (cleanupTask != null) {
+                    cleanupTask.cancel();
+                    cleanupTask = null;
+                }
+                placedBlocks.clear();
+                onComplete.run();
+            },
+            1L,
+            1L
+        );
+    }
+
+    private void restoreBlock(BlockKey key) {
+        Block block = world.getBlockAt(key.x(), key.y(), key.z());
+        String baselineData = baselineBlocks.get(key);
+        if (baselineData == null) {
+            if (!block.getType().isAir()) {
+                block.setType(Material.AIR, false);
+            }
+            return;
+        }
+
+        String currentData = block.getBlockData().getAsString();
+        if (!baselineData.equals(currentData)) {
+            block.setBlockData(Bukkit.createBlockData(baselineData), false);
+        }
     }
 
     private void removeArenaEntities() {
@@ -1349,6 +1422,74 @@ public final class Arena {
     private record BlockKey(int x, int y, int z) {
         private static BlockKey of(Block block) {
             return new BlockKey(block.getX(), block.getY(), block.getZ());
+        }
+    }
+
+    private static final class CleanupCursor {
+
+        private final int minX;
+        private final int maxX;
+        private final int minY;
+        private final int maxY;
+        private final int minZ;
+        private final int maxZ;
+        private final long totalBlocks;
+
+        private int x;
+        private int y;
+        private int z;
+        private long processedBlocks;
+
+        private CleanupCursor(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+            this.minX = minX;
+            this.maxX = maxX;
+            this.minY = minY;
+            this.maxY = maxY;
+            this.minZ = minZ;
+            this.maxZ = maxZ;
+            this.x = minX;
+            this.y = minY;
+            this.z = minZ;
+            this.totalBlocks = ((long) maxX - minX + 1L)
+                * ((long) maxY - minY + 1L)
+                * ((long) maxZ - minZ + 1L);
+        }
+
+        private boolean hasNext() {
+            return processedBlocks < totalBlocks;
+        }
+
+        private BlockKey next() {
+            BlockKey key = new BlockKey(x, y, z);
+            processedBlocks++;
+            advance();
+            return key;
+        }
+
+        private double progress() {
+            if (totalBlocks <= 0L) {
+                return 1.0D;
+            }
+            return processedBlocks / (double) totalBlocks;
+        }
+
+        private void advance() {
+            z++;
+            if (z <= maxZ) {
+                return;
+            }
+            z = minZ;
+            y++;
+            if (y <= maxY) {
+                return;
+            }
+            y = minY;
+            x++;
+            if (x > maxX) {
+                x = maxX;
+                y = maxY;
+                z = maxZ;
+            }
         }
     }
 }

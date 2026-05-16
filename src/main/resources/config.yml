@@ -20,6 +20,7 @@ settings:
   player-max-y-margin: 64.0
   sudden-night-enabled: true
   sudden-night-always: false
+  sudden-night-mob-spawning: false
   sudden-night-delay-seconds: 180
   sudden-night-duration-seconds: 180
   drop-interval-ticks: 100
@@ -28,6 +29,7 @@ settings:
   reset-win-delay-seconds: 20
   rounds-before-reset: 10
   round-start-freeze-ticks: 40
+  cleanup-blocks-per-tick: 4096
   eliminate-below-y: 58
   max-build-y: 96
   drop-height-offset: 6.0

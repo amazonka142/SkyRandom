@@ -54,11 +54,25 @@ reason:
   death_fatal: "получил фатальный удар"
 
 spectator:
+  teleport_name: "&bСледить за игроком"
+  teleport_lore:
+    - "&7Нажми, чтобы выбрать живого игрока"
+    - "&7и телепортироваться к нему."
+  teleport_menu_title: "&bСледить за игроком"
+  teleport_target_name: "&b{player}"
+  teleport_target_lore:
+    - "&7Нажми, чтобы телепортироваться"
+    - "&7к этому игроку."
+  teleport_empty_name: "&cНет живых игроков"
+  teleport_empty_lore:
+    - "&7Сейчас не за кем следить."
+  teleported: "Ты следишь за &f{player}&7."
+  teleport_unavailable: "Этот игрок уже не находится в игре."
   exit_name: "&cВыйти из режима спектатора"
   exit_lore:
     - "&7Нажми, чтобы выйти с арены"
     - "&7и вернуться в лобби."
-  info: "Теперь ты в режиме спектатора. Предмет в слоте &f9 &7вернёт тебя в лобби."
+  info: "Теперь ты в режиме спектатора. Слот &f2 &7телепортирует к игрокам, слот &f9 &7вернёт тебя в лобби."
 
 profile:
   selector_name: "&bМеню SkyRandom"
@@ -140,6 +154,7 @@ host:
   sudden_night_settings_lore:
     - "&7Статус: {status}"
     - "&7Режим: &f{mode}"
+    - "&7Мобы ночью: {mobs}"
     - "&7Задержка: &f{minutes} мин."
     - "{action}"
   sudden_night_toggle_name: "&bСудная Ночь"
@@ -153,6 +168,13 @@ host:
     - "&7Статус: {status}"
     - "&7Если включено, ночь начнётся"
     - "&7сразу и будет весь раунд."
+    - "{action}"
+  sudden_night_mobs_name: "&2Мобы во время Судной Ночи"
+  sudden_night_mobs_lore:
+    - "&7Статус: {status}"
+    - "&7Если включено, Судная Ночь"
+    - "&7разрешит ванильный ночной"
+    - "&7спавн мобов в мире арены."
     - "{action}"
   sudden_night_mode_always: "&5Всегда"
   sudden_night_mode_after: "&fПосле {minutes} мин."
@@ -170,6 +192,7 @@ host:
     - "&eНажми, чтобы увеличить."
   sudden_night_changed: "Судная Ночь: {status}"
   sudden_night_always_changed: "Судная Ночь всегда: {status}"
+  sudden_night_mobs_changed: "Мобы во время Судной Ночи: {status}"
   sudden_night_delay_changed: "Судная Ночь начнётся через &f{minutes} &7мин."
   speed_menu_title: "&6Скорость игры"
   speed_settings_name: "&bСкорость игры"
@@ -282,6 +305,7 @@ arena:
   winner: "&aПобедитель: &f{player}"
   victory_title: "Победа!"
   next_round_in: "Следующий раунд через &f{seconds}&7..."
+  cleanup_started: "&bБезопасно очищаю арену. &7Следующий раунд начнётся, когда поле будет готово."
   cleanup_after: "&bПоле очищено после &f{rounds} &bраундов."
 
 bossbar:
@@ -289,6 +313,7 @@ bossbar:
   countdown: "&fИгра начнется через: &a{seconds} сек"
   drop: "&fДо выдачи предмета: &a{seconds} сек"
   next_round: "&fСледующий раунд через: &d{seconds} сек"
+  cleanup: "&fОчистка арены: &b{percent}%"
   match_finished: "&fМатч завершён"
   winner: "&aПобедитель: &f{player}"
 

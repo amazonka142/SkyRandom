@@ -54,11 +54,25 @@ reason:
   death_fatal: "took a fatal hit"
 
 spectator:
+  teleport_name: "&bFollow player"
+  teleport_lore:
+    - "&7Click to choose a live player"
+    - "&7and teleport to them."
+  teleport_menu_title: "&bFollow player"
+  teleport_target_name: "&b{player}"
+  teleport_target_lore:
+    - "&7Click to teleport"
+    - "&7to this player."
+  teleport_empty_name: "&cNo live players"
+  teleport_empty_lore:
+    - "&7There is nobody to follow right now."
+  teleported: "You are now following &f{player}&7."
+  teleport_unavailable: "That player is no longer in the game."
   exit_name: "&cLeave spectator mode"
   exit_lore:
     - "&7Click to leave the arena"
     - "&7and return to the lobby."
-  info: "You are now a spectator. The item in slot &f9 &7will return you to the lobby."
+  info: "You are now a spectator. Slot &f2 &7teleports to players, slot &f9 &7returns you to the lobby."
 
 profile:
   selector_name: "&bSkyRandom Menu"
@@ -140,6 +154,7 @@ host:
   sudden_night_settings_lore:
     - "&7Status: {status}"
     - "&7Mode: &f{mode}"
+    - "&7Night mobs: {mobs}"
     - "&7Delay: &f{minutes} min."
     - "{action}"
   sudden_night_toggle_name: "&bSudden Night"
@@ -153,6 +168,13 @@ host:
     - "&7Status: {status}"
     - "&7If enabled, night starts"
     - "&7immediately and lasts all round."
+    - "{action}"
+  sudden_night_mobs_name: "&2Sudden Night Mobs"
+  sudden_night_mobs_lore:
+    - "&7Status: {status}"
+    - "&7If enabled, Sudden Night"
+    - "&7allows vanilla night mob"
+    - "&7spawning in the arena world."
     - "{action}"
   sudden_night_mode_always: "&5Always"
   sudden_night_mode_after: "&fAfter {minutes} min."
@@ -170,6 +192,7 @@ host:
     - "&eClick to increase."
   sudden_night_changed: "Sudden Night: {status}"
   sudden_night_always_changed: "Always Sudden Night: {status}"
+  sudden_night_mobs_changed: "Sudden Night mobs: {status}"
   sudden_night_delay_changed: "Sudden Night will start after &f{minutes} &7min."
   speed_menu_title: "&6Game Speed"
   speed_settings_name: "&bGame Speed"
@@ -282,6 +305,7 @@ arena:
   winner: "&aWinner: &f{player}"
   victory_title: "Victory!"
   next_round_in: "Next round in &f{seconds}&7..."
+  cleanup_started: "&bCleaning the arena safely. &7The next round will start when it is ready."
   cleanup_after: "&bThe field was cleared after &f{rounds} &brounds."
 
 bossbar:
@@ -289,6 +313,7 @@ bossbar:
   countdown: "&fGame starts in: &a{seconds} sec"
   drop: "&fNext item drop in: &a{seconds} sec"
   next_round: "&fNext round in: &d{seconds} sec"
+  cleanup: "&fCleaning arena: &b{percent}%"
   match_finished: "&fMatch finished"
   winner: "&aWinner: &f{player}"
 

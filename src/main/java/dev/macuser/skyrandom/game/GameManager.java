@@ -7,6 +7,7 @@ import dev.macuser.skyrandom.gui.HostMenuHolder;
 import dev.macuser.skyrandom.gui.HostTransferMenuHolder;
 import dev.macuser.skyrandom.gui.LanguageMenuHolder;
 import dev.macuser.skyrandom.gui.ProfileMenuHolder;
+import dev.macuser.skyrandom.gui.SpectatorTeleportMenuHolder;
 import dev.macuser.skyrandom.gui.StatsMenuHolder;
 import dev.macuser.skyrandom.lang.MessageManager;
 import dev.macuser.skyrandom.lang.PlayerLanguage;
@@ -63,8 +64,10 @@ public final class GameManager {
     private static final long DEFAULT_WORLD_NIGHT_TIME = 18_000L;
     private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 180;
     private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
+    private static final boolean DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING = false;
     private static final int DEFAULT_LOBBY_ROUNDS_BEFORE_RESET = 10;
     private static final String DEFAULT_LOBBY_ARENA_ID = "random";
+    private static final int DEFAULT_CLEANUP_BLOCKS_PER_TICK = 4096;
     private static final int DROP_INTERVAL_FAST_TICKS = 60;
     private static final int DROP_INTERVAL_CLASSIC_TICKS = 100;
     private static final int DROP_INTERVAL_SLOW_TICKS = 200;
@@ -83,6 +86,8 @@ public final class GameManager {
     private final MessageManager messages;
     private final PlayerStatsStore statsStore;
     private final NamespacedKey spectatorExitItemKey;
+    private final NamespacedKey spectatorTeleportItemKey;
+    private final NamespacedKey spectatorTeleportTargetItemKey;
     private final NamespacedKey languageSelectorItemKey;
     private final NamespacedKey languageOptionItemKey;
     private final NamespacedKey profileStatsItemKey;
@@ -93,6 +98,7 @@ public final class GameManager {
     private final NamespacedKey hostMenuToggleSuddenNightItemKey;
     private final NamespacedKey hostMenuOpenSubmenuItemKey;
     private final NamespacedKey hostMenuToggleSuddenNightAlwaysItemKey;
+    private final NamespacedKey hostMenuToggleSuddenNightMobsItemKey;
     private final NamespacedKey hostMenuSuddenNightDelayAdjustItemKey;
     private final NamespacedKey hostMenuDropIntervalItemKey;
     private final NamespacedKey hostMenuArenaSelectItemKey;
@@ -113,6 +119,7 @@ public final class GameManager {
     private boolean soloTestMode = true;
     private boolean suddenNightEnabled = true;
     private boolean suddenNightAlways = false;
+    private boolean suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
     private String defaultArenaId = "random";
     private int lobbyProtectionRadius = 12;
     private int lobbyProtectionBelow = 14;
@@ -133,6 +140,8 @@ public final class GameManager {
         this.messages = new MessageManager(plugin);
         this.statsStore = new PlayerStatsStore(plugin);
         this.spectatorExitItemKey = new NamespacedKey(plugin, "spectator_exit_item");
+        this.spectatorTeleportItemKey = new NamespacedKey(plugin, "spectator_teleport_item");
+        this.spectatorTeleportTargetItemKey = new NamespacedKey(plugin, "spectator_teleport_target");
         this.languageSelectorItemKey = new NamespacedKey(plugin, "language_selector_item");
         this.languageOptionItemKey = new NamespacedKey(plugin, "language_option_item");
         this.profileStatsItemKey = new NamespacedKey(plugin, "profile_stats_item");
@@ -143,6 +152,7 @@ public final class GameManager {
         this.hostMenuToggleSuddenNightItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night");
         this.hostMenuOpenSubmenuItemKey = new NamespacedKey(plugin, "host_menu_open_submenu");
         this.hostMenuToggleSuddenNightAlwaysItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_always");
+        this.hostMenuToggleSuddenNightMobsItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_mobs");
         this.hostMenuSuddenNightDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_sudden_night_delay_adjust");
         this.hostMenuDropIntervalItemKey = new NamespacedKey(plugin, "host_menu_drop_interval");
         this.hostMenuArenaSelectItemKey = new NamespacedKey(plugin, "host_menu_arena_select");
@@ -167,6 +177,9 @@ public final class GameManager {
         this.soloTestMode = settings == null || settings.getBoolean("solo-test-mode", true);
         this.suddenNightEnabled = settings == null || settings.getBoolean("sudden-night-enabled", true);
         this.suddenNightAlways = settings != null && settings.getBoolean("sudden-night-always", false);
+        this.suddenNightMobSpawning = settings != null
+            ? settings.getBoolean("sudden-night-mob-spawning", DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING)
+            : DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
         this.defaultArenaId = settings != null ? settings.getString("default-arena", "random") : "random";
         this.lobbyProtectionRadius = settings != null ? Math.max(1, settings.getInt("lobby-protection-radius", 12)) : 12;
         this.lobbyProtectionBelow = settings != null ? Math.max(0, settings.getInt("lobby-protection-below", 14)) : 14;
@@ -202,6 +215,9 @@ public final class GameManager {
         double globalDropHeightOffset = settings != null ? settings.getDouble("drop-height-offset", 5.0D) : 5.0D;
         int globalRoundsBeforeReset = settings != null ? settings.getInt("rounds-before-reset", DEFAULT_LOBBY_ROUNDS_BEFORE_RESET) : DEFAULT_LOBBY_ROUNDS_BEFORE_RESET;
         int globalRoundStartFreezeTicks = settings != null ? settings.getInt("round-start-freeze-ticks", 40) : 40;
+        int globalCleanupBlocksPerTick = settings != null
+            ? settings.getInt("cleanup-blocks-per-tick", DEFAULT_CLEANUP_BLOCKS_PER_TICK)
+            : DEFAULT_CLEANUP_BLOCKS_PER_TICK;
         boolean globalAllowPlace = settings == null || settings.getBoolean("allow-place-blocks", true);
         boolean globalAllowBreakMap = settings != null && settings.getBoolean("allow-break-map-blocks", false);
         boolean globalOnlyBreakOwn = settings == null || settings.getBoolean("only-break-own-placed-blocks", true);
@@ -273,6 +289,7 @@ public final class GameManager {
                 arenaSection.getBoolean("only-break-own-placed-blocks", globalOnlyBreakOwn),
                 arenaSection.getInt("rounds-before-reset", lobbyRoundsBeforeReset),
                 arenaSection.getInt("round-start-freeze-ticks", globalRoundStartFreezeTicks),
+                arenaSection.getInt("cleanup-blocks-per-tick", globalCleanupBlocksPerTick),
                 arenaSection.getDouble("player-boundary-margin", globalPlayerBoundaryMargin),
                 arenaSection.getDouble("player-max-y-margin", globalPlayerMaxYMargin)
             );
@@ -571,6 +588,7 @@ public final class GameManager {
             player.teleport(target);
         }
 
+        player.getInventory().setItem(1, createSpectatorTeleportItem(player));
         player.getInventory().setItem(8, createSpectatorExitItem(player));
     }
 
@@ -672,6 +690,7 @@ public final class GameManager {
             if (!alreadyRunning) {
                 announceSuddenNight(state.world, true);
             }
+            updateSuddenNightVanillaMobSpawning(state);
             return true;
         }
 
@@ -811,6 +830,7 @@ public final class GameManager {
         world.setTime(DEFAULT_WORLD_NIGHT_TIME);
         world.setStorm(false);
         announceSuddenNight(world, true);
+        updateSuddenNightVanillaMobSpawning(state);
 
         state.nightTask = plugin.getServer().getScheduler().runTaskLater(
             plugin,
@@ -828,6 +848,7 @@ public final class GameManager {
         state.nightTask = null;
         resetWorldToDay(state.world);
         announceSuddenNight(state.world, false);
+        restoreSuddenNightVanillaMobSpawning(state);
 
         if (state.activeSessions <= 0) {
             suddenNightStates.remove(worldId);
@@ -864,6 +885,49 @@ public final class GameManager {
                 );
             }
         }
+    }
+
+    private void refreshSuddenNightMobSpawns() {
+        for (SuddenNightWorldState state : suddenNightStates.values()) {
+            updateSuddenNightVanillaMobSpawning(state);
+        }
+    }
+
+    private void updateSuddenNightVanillaMobSpawning(SuddenNightWorldState state) {
+        if (state == null) {
+            return;
+        }
+
+        boolean shouldEnable = suddenNightEnabled
+            && suddenNightMobSpawning
+            && state.completedCycle
+            && state.activeSessions > 0
+            && state.world != null;
+        if (!shouldEnable) {
+            restoreSuddenNightVanillaMobSpawning(state);
+            return;
+        }
+
+        if (!state.vanillaMobSpawningApplied) {
+            state.previousSpawnMobs = state.world.getGameRuleValue(GameRules.SPAWN_MOBS);
+            state.previousSpawnMonsters = state.world.getGameRuleValue(GameRules.SPAWN_MONSTERS);
+            state.vanillaMobSpawningApplied = true;
+        }
+
+        state.world.setGameRule(GameRules.SPAWN_MOBS, true);
+        state.world.setGameRule(GameRules.SPAWN_MONSTERS, true);
+    }
+
+    private void restoreSuddenNightVanillaMobSpawning(SuddenNightWorldState state) {
+        if (state == null || state.world == null || !state.vanillaMobSpawningApplied) {
+            return;
+        }
+
+        state.world.setGameRule(GameRules.SPAWN_MOBS, state.previousSpawnMobs == null || state.previousSpawnMobs);
+        state.world.setGameRule(GameRules.SPAWN_MONSTERS, state.previousSpawnMonsters == null || state.previousSpawnMonsters);
+        state.previousSpawnMobs = null;
+        state.previousSpawnMonsters = null;
+        state.vanillaMobSpawningApplied = false;
     }
 
     private void clearSuddenNightStates() {
@@ -929,6 +993,7 @@ public final class GameManager {
             state.nightTask.cancel();
             state.nightTask = null;
         }
+        restoreSuddenNightVanillaMobSpawning(state);
         if (resetDay) {
             resetWorldToDay(state.world);
         }
@@ -1006,6 +1071,15 @@ public final class GameManager {
         return meta != null && meta.getPersistentDataContainer().has(spectatorExitItemKey, PersistentDataType.BYTE);
     }
 
+    public boolean isSpectatorTeleportItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(spectatorTeleportItemKey, PersistentDataType.BYTE);
+    }
+
     public boolean isLanguageSelectorItem(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;
@@ -1046,6 +1120,10 @@ public final class GameManager {
 
     public boolean isHostTransferMenu(Inventory inventory) {
         return inventory != null && inventory.getHolder() instanceof HostTransferMenuHolder;
+    }
+
+    public boolean isSpectatorTeleportMenu(Inventory inventory) {
+        return inventory != null && inventory.getHolder() instanceof SpectatorTeleportMenuHolder;
     }
 
     public void openProfileMenu(Player player) {
@@ -1121,6 +1199,81 @@ public final class GameManager {
         }
     }
 
+    public void openSpectatorTeleportMenu(Player player) {
+        Arena arena = getArena(player);
+        if (arena == null || !arena.isSpectator(player)) {
+            return;
+        }
+
+        SpectatorTeleportMenuHolder holder = new SpectatorTeleportMenuHolder();
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "spectator.teleport_menu_title"));
+        holder.setInventory(inventory);
+
+        int slot = 10;
+        for (UUID targetId : arena.getActivePlayersSnapshot()) {
+            Player target = Bukkit.getPlayer(targetId);
+            if (target == null || !target.isOnline() || !arena.isActivePlayer(target)) {
+                continue;
+            }
+            if (slot >= 17) {
+                break;
+            }
+            inventory.setItem(slot, createSpectatorTeleportTargetItem(player, target));
+            slot++;
+        }
+
+        if (slot == 10) {
+            inventory.setItem(13, createSpectatorTeleportEmptyItem(player));
+        }
+        inventory.setItem(22, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void handleSpectatorTeleportMenuClick(Player player, ItemStack clickedItem) {
+        if (clickedItem == null || clickedItem.getType().isAir()) {
+            return;
+        }
+        if (isBackItem(clickedItem)) {
+            player.closeInventory();
+            return;
+        }
+
+        Arena arena = getArena(player);
+        if (arena == null || !arena.isSpectator(player)) {
+            player.closeInventory();
+            return;
+        }
+
+        ItemMeta meta = clickedItem.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        String rawTargetId = meta.getPersistentDataContainer().get(spectatorTeleportTargetItemKey, PersistentDataType.STRING);
+        if (rawTargetId == null || rawTargetId.isBlank()) {
+            return;
+        }
+
+        UUID targetId;
+        try {
+            targetId = UUID.fromString(rawTargetId);
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+
+        Player target = Bukkit.getPlayer(targetId);
+        if (target == null || !target.isOnline() || getArena(target) != arena || !arena.isActivePlayer(target)) {
+            sendLocalized(player, "spectator.teleport_unavailable");
+            openSpectatorTeleportMenu(player);
+            return;
+        }
+
+        Location targetLocation = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        player.teleport(targetLocation);
+        player.closeInventory();
+        sendLocalized(player, "spectator.teleported", "player", target.getName());
+    }
+
     public void openHostMenu(Player player) {
         if (!isLobbyHost(player)) {
             sendLocalized(player, "host.not_host");
@@ -1156,6 +1309,7 @@ public final class GameManager {
         inventory.setItem(12, createHostSuddenNightDelayAdjustItem(player, -1));
         inventory.setItem(13, createHostSuddenNightDelayDisplayItem(player));
         inventory.setItem(14, createHostSuddenNightDelayAdjustItem(player, 1));
+        inventory.setItem(15, createHostSuddenNightMobsItem(player));
         inventory.setItem(16, createHostSuddenNightAlwaysItem(player));
         inventory.setItem(22, createBackItem(player));
         player.openInventory(inventory);
@@ -1333,6 +1487,14 @@ public final class GameManager {
             return;
         }
 
+        if (meta.getPersistentDataContainer().has(hostMenuToggleSuddenNightMobsItemKey, PersistentDataType.BYTE)) {
+            suddenNightMobSpawning = !suddenNightMobSpawning;
+            refreshSuddenNightMobSpawns();
+            sendLocalized(player, "host.sudden_night_mobs_changed", "status", getHostStatusText(player, suddenNightMobSpawning));
+            openHostSuddenNightMenu(player);
+            return;
+        }
+
         Integer suddenNightDelayDelta = meta.getPersistentDataContainer().get(hostMenuSuddenNightDelayAdjustItemKey, PersistentDataType.INTEGER);
         if (suddenNightDelayDelta != null) {
             int minutes = Math.max(1, getSuddenNightDelayMinutes() + suddenNightDelayDelta);
@@ -1452,6 +1614,7 @@ public final class GameManager {
             if (arena != null) {
                 arena.refreshPlayerLocale(player);
                 if (arena.isSpectator(player)) {
+                    player.getInventory().setItem(1, createSpectatorTeleportItem(player));
                     player.getInventory().setItem(8, createSpectatorExitItem(player));
                 } else if (!arena.isActivePlayer(player)) {
                     giveLobbyUtilityItems(player);
@@ -1782,6 +1945,7 @@ public final class GameManager {
                 "host.sudden_night_settings_lore",
                 "status", getHostStatusText(player, suddenNightEnabled),
                 "mode", getSuddenNightModeDisplay(player),
+                "mobs", getHostStatusText(player, suddenNightMobSpawning),
                 "minutes", getSuddenNightDelayMinutes(),
                 "action", tr(player, "host.click_open")
             ));
@@ -1826,6 +1990,24 @@ public final class GameManager {
             ));
             meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightAlwaysItemKey, PersistentDataType.BYTE, (byte) 1);
             addSelectedGlow(meta, suddenNightAlways);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostSuddenNightMobsItem(Player player) {
+        ItemStack item = new ItemStack(Material.ZOMBIE_HEAD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.sudden_night_mobs_name"));
+            meta.setLore(trList(
+                player,
+                "host.sudden_night_mobs_lore",
+                "status", getHostStatusText(player, suddenNightMobSpawning),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleSuddenNightMobsItemKey, PersistentDataType.BYTE, (byte) 1);
+            addSelectedGlow(meta, suddenNightMobSpawning);
             item.setItemMeta(meta);
         }
         return item;
@@ -2156,6 +2338,7 @@ public final class GameManager {
     private void resetLobbyHostSettingsToDefaults() {
         suddenNightEnabled = true;
         suddenNightAlways = false;
+        suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
         suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
         setLobbyRoundsBeforeReset(DEFAULT_LOBBY_ROUNDS_BEFORE_RESET);
         setLobbyDropIntervalTicks(DROP_INTERVAL_CLASSIC_TICKS);
@@ -2321,6 +2504,45 @@ public final class GameManager {
         return item;
     }
 
+    private ItemStack createSpectatorTeleportItem(Player player) {
+        ItemStack item = new ItemStack(Material.ENDER_EYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "spectator.teleport_name"));
+            meta.setLore(trList(player, "spectator.teleport_lore"));
+            meta.getPersistentDataContainer().set(spectatorTeleportItemKey, PersistentDataType.BYTE, (byte) 1);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createSpectatorTeleportTargetItem(Player viewer, Player target) {
+        ItemStack item = new ItemStack(Material.PLAYER_HEAD);
+        ItemMeta rawMeta = item.getItemMeta();
+        if (!(rawMeta instanceof SkullMeta meta)) {
+            return item;
+        }
+
+        OfflinePlayer offlineTarget = target;
+        meta.setOwningPlayer(offlineTarget);
+        meta.setDisplayName(tr(viewer, "spectator.teleport_target_name", "player", target.getName()));
+        meta.setLore(trList(viewer, "spectator.teleport_target_lore"));
+        meta.getPersistentDataContainer().set(spectatorTeleportTargetItemKey, PersistentDataType.STRING, target.getUniqueId().toString());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createSpectatorTeleportEmptyItem(Player player) {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "spectator.teleport_empty_name"));
+            meta.setLore(trList(player, "spectator.teleport_empty_lore"));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private double getSafeMaxHealth(Player player) {
         double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) != null
             ? player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue()
@@ -2465,6 +2687,9 @@ public final class GameManager {
         private boolean completedCycle;
         private BukkitTask startTask;
         private BukkitTask nightTask;
+        private boolean vanillaMobSpawningApplied;
+        private Boolean previousSpawnMobs;
+        private Boolean previousSpawnMonsters;
 
         private SuddenNightWorldState(World world) {
             this.world = world;
