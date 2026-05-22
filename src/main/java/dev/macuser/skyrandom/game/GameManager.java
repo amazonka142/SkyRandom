@@ -44,6 +44,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -59,12 +60,23 @@ import org.bukkit.util.Vector;
 
 public final class GameManager {
 
+    private static final int[] HOST_MAP_SELECTION_SLOTS = {
+        10, 11, 12, 13, 14, 15, 16,
+        19, 20, 21, 22, 23, 24, 25
+    };
     private static final long COMBAT_TAG_MILLIS = 15_000L;
     private static final long DEFAULT_WORLD_DAY_TIME = 6_000L;
     private static final long DEFAULT_WORLD_NIGHT_TIME = 18_000L;
     private static final int DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS = 180;
     private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
     private static final boolean DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING = false;
+    private static final boolean DEFAULT_SHRINKING_ZONE_ENABLED = false;
+    private static final int DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS = 90;
+    private static final int DEFAULT_SHRINKING_ZONE_DURATION_SECONDS = 180;
+    private static final double DEFAULT_SHRINKING_ZONE_MIN_SIZE = 32.0D;
+    private static final double SHRINKING_ZONE_FINAL_SIZE = 16.0D;
+    private static final double DEFAULT_SHRINKING_ZONE_DAMAGE_PER_SECOND = 1.0D;
+    private static final int SHRINKING_ZONE_TIME_STEP_SECONDS = 30;
     private static final int DEFAULT_LOBBY_ROUNDS_BEFORE_RESET = 10;
     private static final String DEFAULT_LOBBY_ARENA_ID = "random";
     private static final int DEFAULT_CLEANUP_BLOCKS_PER_TICK = 4096;
@@ -100,6 +112,9 @@ public final class GameManager {
     private final NamespacedKey hostMenuToggleSuddenNightAlwaysItemKey;
     private final NamespacedKey hostMenuToggleSuddenNightMobsItemKey;
     private final NamespacedKey hostMenuSuddenNightDelayAdjustItemKey;
+    private final NamespacedKey hostMenuToggleShrinkingZoneItemKey;
+    private final NamespacedKey hostMenuShrinkingZoneDelayAdjustItemKey;
+    private final NamespacedKey hostMenuShrinkingZoneDurationAdjustItemKey;
     private final NamespacedKey hostMenuDropIntervalItemKey;
     private final NamespacedKey hostMenuArenaSelectItemKey;
     private final NamespacedKey hostMenuRoundsAdjustItemKey;
@@ -120,6 +135,7 @@ public final class GameManager {
     private boolean suddenNightEnabled = true;
     private boolean suddenNightAlways = false;
     private boolean suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
+    private boolean shrinkingZoneEnabled = DEFAULT_SHRINKING_ZONE_ENABLED;
     private String defaultArenaId = "random";
     private int lobbyProtectionRadius = 12;
     private int lobbyProtectionBelow = 14;
@@ -127,6 +143,10 @@ public final class GameManager {
     private int arenaBorderWarningDistance = 4;
     private int suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
     private int suddenNightDurationSeconds = DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
+    private int shrinkingZoneStartDelaySeconds = DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS;
+    private int shrinkingZoneDurationSeconds = DEFAULT_SHRINKING_ZONE_DURATION_SECONDS;
+    private double shrinkingZoneMinSize = DEFAULT_SHRINKING_ZONE_MIN_SIZE;
+    private double shrinkingZoneDamagePerSecond = DEFAULT_SHRINKING_ZONE_DAMAGE_PER_SECOND;
     private boolean lobbyAutostartEnabled = true;
     private int lobbyRoundsBeforeReset = DEFAULT_LOBBY_ROUNDS_BEFORE_RESET;
     private int lobbyDropIntervalTicks = DROP_INTERVAL_CLASSIC_TICKS;
@@ -154,6 +174,9 @@ public final class GameManager {
         this.hostMenuToggleSuddenNightAlwaysItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_always");
         this.hostMenuToggleSuddenNightMobsItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_mobs");
         this.hostMenuSuddenNightDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_sudden_night_delay_adjust");
+        this.hostMenuToggleShrinkingZoneItemKey = new NamespacedKey(plugin, "host_menu_toggle_shrinking_zone");
+        this.hostMenuShrinkingZoneDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_shrinking_zone_delay_adjust");
+        this.hostMenuShrinkingZoneDurationAdjustItemKey = new NamespacedKey(plugin, "host_menu_shrinking_zone_duration_adjust");
         this.hostMenuDropIntervalItemKey = new NamespacedKey(plugin, "host_menu_drop_interval");
         this.hostMenuArenaSelectItemKey = new NamespacedKey(plugin, "host_menu_arena_select");
         this.hostMenuRoundsAdjustItemKey = new NamespacedKey(plugin, "host_menu_rounds_adjust");
@@ -191,6 +214,21 @@ public final class GameManager {
         this.suddenNightDurationSeconds = settings != null
             ? Math.max(1, settings.getInt("sudden-night-duration-seconds", DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS))
             : DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS;
+        this.shrinkingZoneEnabled = settings != null
+            ? settings.getBoolean("shrinking-zone-enabled", DEFAULT_SHRINKING_ZONE_ENABLED)
+            : DEFAULT_SHRINKING_ZONE_ENABLED;
+        this.shrinkingZoneStartDelaySeconds = settings != null
+            ? Math.max(0, settings.getInt("shrinking-zone-start-delay-seconds", DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS))
+            : DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS;
+        this.shrinkingZoneDurationSeconds = settings != null
+            ? Math.max(SHRINKING_ZONE_TIME_STEP_SECONDS, settings.getInt("shrinking-zone-duration-seconds", DEFAULT_SHRINKING_ZONE_DURATION_SECONDS))
+            : DEFAULT_SHRINKING_ZONE_DURATION_SECONDS;
+        this.shrinkingZoneMinSize = settings != null
+            ? Math.max(4.0D, settings.getDouble("shrinking-zone-min-size", DEFAULT_SHRINKING_ZONE_MIN_SIZE))
+            : DEFAULT_SHRINKING_ZONE_MIN_SIZE;
+        this.shrinkingZoneDamagePerSecond = settings != null
+            ? Math.max(0.0D, settings.getDouble("shrinking-zone-damage-per-second", DEFAULT_SHRINKING_ZONE_DAMAGE_PER_SECOND))
+            : DEFAULT_SHRINKING_ZONE_DAMAGE_PER_SECOND;
         double globalPlayerBoundaryMargin = settings != null ? Math.max(0.0D, settings.getDouble("player-boundary-margin", 12.0D)) : 12.0D;
         double globalPlayerMaxYMargin = settings != null ? Math.max(0.0D, settings.getDouble("player-max-y-margin", 64.0D)) : 64.0D;
         this.messages.reload(settings);
@@ -750,13 +788,17 @@ public final class GameManager {
     }
 
     public void applyArenaWorldBorder(Player player, Arena arena) {
+        applyArenaWorldBorder(player, arena, arena == null ? 1.0D : arena.getBorderSize());
+    }
+
+    public void applyArenaWorldBorder(Player player, Arena arena, double borderSize) {
         if (player == null || arena == null) {
             return;
         }
 
         WorldBorder border = plugin.getServer().createWorldBorder();
         border.setCenter(arena.getBorderCenterX(), arena.getBorderCenterZ());
-        border.setSize(Math.max(1.0D, arena.getBorderSize()));
+        border.setSize(Math.max(1.0D, borderSize));
         border.setDamageBuffer(0.0D);
         border.setDamageAmount(0.0D);
         border.setWarningDistance(arenaBorderWarningDistance);
@@ -898,12 +940,11 @@ public final class GameManager {
             return;
         }
 
-        boolean shouldEnable = suddenNightEnabled
-            && suddenNightMobSpawning
+        boolean shouldApply = suddenNightEnabled
             && state.completedCycle
             && state.activeSessions > 0
             && state.world != null;
-        if (!shouldEnable) {
+        if (!shouldApply) {
             restoreSuddenNightVanillaMobSpawning(state);
             return;
         }
@@ -914,8 +955,14 @@ public final class GameManager {
             state.vanillaMobSpawningApplied = true;
         }
 
-        state.world.setGameRule(GameRules.SPAWN_MOBS, true);
-        state.world.setGameRule(GameRules.SPAWN_MONSTERS, true);
+        if (suddenNightMobSpawning) {
+            state.world.setGameRule(GameRules.SPAWN_MOBS, true);
+            state.world.setGameRule(GameRules.SPAWN_MONSTERS, true);
+            return;
+        }
+
+        state.world.setGameRule(GameRules.SPAWN_MOBS, state.previousSpawnMobs == null || state.previousSpawnMobs);
+        state.world.setGameRule(GameRules.SPAWN_MONSTERS, false);
     }
 
     private void restoreSuddenNightVanillaMobSpawning(SuddenNightWorldState state) {
@@ -1015,6 +1062,49 @@ public final class GameManager {
                 arena.filterExplosion(blocks);
             }
         }
+    }
+
+    public boolean shouldBlockSuddenNightHostileSpawn(Location location) {
+        if (suddenNightMobSpawning || location == null || location.getWorld() == null) {
+            return false;
+        }
+        if (!hasActiveSuddenNight(location.getWorld())) {
+            return false;
+        }
+
+        Arena arena = findArenaByLocation(location);
+        return arena != null && arena.getState() == GameState.RUNNING;
+    }
+
+    public boolean shouldBlockArenaHostileSpawn(Location location, CreatureSpawnEvent.SpawnReason reason) {
+        if (location == null || location.getWorld() == null) {
+            return false;
+        }
+
+        Arena arena = findArenaByLocation(location);
+        if (arena == null || arena.getState() != GameState.RUNNING) {
+            return false;
+        }
+        if (isSpawnerHostileSpawn(reason)) {
+            return true;
+        }
+        if (!isVanillaHostileSpawn(reason)) {
+            return false;
+        }
+
+        return !suddenNightMobSpawning || !hasActiveSuddenNight(location.getWorld());
+    }
+
+    private static boolean isSpawnerHostileSpawn(CreatureSpawnEvent.SpawnReason reason) {
+        return reason == CreatureSpawnEvent.SpawnReason.SPAWNER
+            || reason == CreatureSpawnEvent.SpawnReason.TRIAL_SPAWNER;
+    }
+
+    private static boolean isVanillaHostileSpawn(CreatureSpawnEvent.SpawnReason reason) {
+        return switch (reason) {
+            case NATURAL, PATROL, REINFORCEMENTS -> true;
+            default -> false;
+        };
     }
 
     public void send(CommandSender sender, String message) {
@@ -1290,6 +1380,7 @@ public final class GameManager {
         inventory.setItem(28, createHostSuddenNightMenuItem(player));
         inventory.setItem(30, createHostGameSpeedMenuItem(player));
         inventory.setItem(32, createHostAutostartItem(player));
+        inventory.setItem(34, createHostShrinkingZoneMenuItem(player));
         inventory.setItem(31, createHostTransferItem(player));
         inventory.setItem(42, createHostResetDefaultsItem(player));
         inventory.setItem(40, createBackItem(player));
@@ -1331,6 +1422,26 @@ public final class GameManager {
         player.openInventory(inventory);
     }
 
+    public void openHostShrinkingZoneMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.SHRINKING_ZONE);
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.zone_menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(10, createHostShrinkingZoneToggleItem(player));
+        inventory.setItem(11, createHostShrinkingZoneDelayAdjustItem(player, -SHRINKING_ZONE_TIME_STEP_SECONDS));
+        inventory.setItem(12, createHostShrinkingZoneDelayDisplayItem(player));
+        inventory.setItem(13, createHostShrinkingZoneDelayAdjustItem(player, SHRINKING_ZONE_TIME_STEP_SECONDS));
+        inventory.setItem(14, createHostShrinkingZoneDurationAdjustItem(player, -SHRINKING_ZONE_TIME_STEP_SECONDS));
+        inventory.setItem(15, createHostShrinkingZoneDurationDisplayItem(player));
+        inventory.setItem(16, createHostShrinkingZoneDurationAdjustItem(player, SHRINKING_ZONE_TIME_STEP_SECONDS));
+        inventory.setItem(22, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
     public void openHostMapSelectionMenu(Player player) {
         if (!isLobbyHost(player)) {
             sendLocalized(player, "host.not_host");
@@ -1338,20 +1449,20 @@ public final class GameManager {
         }
 
         HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.MAP_SELECTION);
-        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.map_menu_title"));
+        Inventory inventory = Bukkit.createInventory(holder, 36, tr(player, "host.map_menu_title"));
         holder.setInventory(inventory);
-        inventory.setItem(10, createHostMapSelectionItem(player, null));
+        inventory.setItem(HOST_MAP_SELECTION_SLOTS[0], createHostMapSelectionItem(player, null));
 
-        int slot = 11;
+        int slotIndex = 1;
         for (Arena arena : arenas.values()) {
-            if (slot >= 17) {
+            if (slotIndex >= HOST_MAP_SELECTION_SLOTS.length) {
                 break;
             }
-            inventory.setItem(slot, createHostMapSelectionItem(player, arena));
-            slot++;
+            inventory.setItem(HOST_MAP_SELECTION_SLOTS[slotIndex], createHostMapSelectionItem(player, arena));
+            slotIndex++;
         }
 
-        inventory.setItem(22, createBackItem(player));
+        inventory.setItem(31, createBackItem(player));
         player.openInventory(inventory);
     }
 
@@ -1460,6 +1571,7 @@ public final class GameManager {
                 case "sudden_night" -> openHostSuddenNightMenu(player);
                 case "game_speed" -> openHostGameSpeedMenu(player);
                 case "map_selection" -> openHostMapSelectionMenu(player);
+                case "shrinking_zone" -> openHostShrinkingZoneMenu(player);
                 default -> {
                 }
             }
@@ -1502,6 +1614,32 @@ public final class GameManager {
             refreshSuddenNightSessions();
             sendLocalized(player, "host.sudden_night_delay_changed", "minutes", minutes);
             openHostSuddenNightMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuToggleShrinkingZoneItemKey, PersistentDataType.BYTE)) {
+            shrinkingZoneEnabled = !shrinkingZoneEnabled;
+            refreshShrinkingZoneSessions();
+            sendLocalized(player, "host.zone_changed", "status", getHostStatusText(player, shrinkingZoneEnabled));
+            openHostShrinkingZoneMenu(player);
+            return;
+        }
+
+        Integer shrinkingZoneDelayDelta = meta.getPersistentDataContainer().get(hostMenuShrinkingZoneDelayAdjustItemKey, PersistentDataType.INTEGER);
+        if (shrinkingZoneDelayDelta != null) {
+            shrinkingZoneStartDelaySeconds = Math.max(0, shrinkingZoneStartDelaySeconds + shrinkingZoneDelayDelta);
+            refreshShrinkingZoneSessions();
+            sendLocalized(player, "host.zone_delay_changed", "seconds", shrinkingZoneStartDelaySeconds);
+            openHostShrinkingZoneMenu(player);
+            return;
+        }
+
+        Integer shrinkingZoneDurationDelta = meta.getPersistentDataContainer().get(hostMenuShrinkingZoneDurationAdjustItemKey, PersistentDataType.INTEGER);
+        if (shrinkingZoneDurationDelta != null) {
+            shrinkingZoneDurationSeconds = Math.max(SHRINKING_ZONE_TIME_STEP_SECONDS, shrinkingZoneDurationSeconds + shrinkingZoneDurationDelta);
+            refreshShrinkingZoneSessions();
+            sendLocalized(player, "host.zone_duration_changed", "seconds", shrinkingZoneDurationSeconds);
+            openHostShrinkingZoneMenu(player);
             return;
         }
 
@@ -2044,6 +2182,103 @@ public final class GameManager {
         return item;
     }
 
+    private ItemStack createHostShrinkingZoneMenuItem(Player player) {
+        ItemStack item = new ItemStack(Material.BEACON);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.zone_settings_name"));
+            meta.setLore(trList(
+                player,
+                "host.zone_settings_lore",
+                "status", getHostStatusText(player, shrinkingZoneEnabled),
+                "delay", shrinkingZoneStartDelaySeconds,
+                "duration", shrinkingZoneDurationSeconds,
+                "size", formatWholeNumber(shrinkingZoneMinSize),
+                "final_size", formatWholeNumber(SHRINKING_ZONE_FINAL_SIZE),
+                "damage", formatDecimal(shrinkingZoneDamagePerSecond),
+                "action", tr(player, "host.click_open")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING, "shrinking_zone");
+            addSelectedGlow(meta, shrinkingZoneEnabled);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostShrinkingZoneToggleItem(Player player) {
+        ItemStack item = new ItemStack(shrinkingZoneEnabled ? Material.LIME_DYE : Material.GRAY_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.zone_toggle_name"));
+            meta.setLore(trList(
+                player,
+                "host.zone_toggle_lore",
+                "status", getHostStatusText(player, shrinkingZoneEnabled),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleShrinkingZoneItemKey, PersistentDataType.BYTE, (byte) 1);
+            addSelectedGlow(meta, shrinkingZoneEnabled);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostShrinkingZoneDelayAdjustItem(Player player, int deltaSeconds) {
+        ItemStack item = new ItemStack(deltaSeconds > 0 ? Material.LIME_DYE : Material.RED_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, deltaSeconds > 0 ? "host.zone_delay_plus_name" : "host.zone_delay_minus_name"));
+            meta.setLore(trList(
+                player,
+                deltaSeconds > 0 ? "host.zone_delay_plus_lore" : "host.zone_delay_minus_lore",
+                "seconds", shrinkingZoneStartDelaySeconds,
+                "step", Math.abs(deltaSeconds)
+            ));
+            meta.getPersistentDataContainer().set(hostMenuShrinkingZoneDelayAdjustItemKey, PersistentDataType.INTEGER, deltaSeconds);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostShrinkingZoneDelayDisplayItem(Player player) {
+        ItemStack item = new ItemStack(Material.CLOCK);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.zone_delay_name"));
+            meta.setLore(trList(player, "host.zone_delay_lore", "seconds", shrinkingZoneStartDelaySeconds));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostShrinkingZoneDurationAdjustItem(Player player, int deltaSeconds) {
+        ItemStack item = new ItemStack(deltaSeconds > 0 ? Material.LIME_DYE : Material.RED_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, deltaSeconds > 0 ? "host.zone_duration_plus_name" : "host.zone_duration_minus_name"));
+            meta.setLore(trList(
+                player,
+                deltaSeconds > 0 ? "host.zone_duration_plus_lore" : "host.zone_duration_minus_lore",
+                "seconds", shrinkingZoneDurationSeconds,
+                "step", Math.abs(deltaSeconds)
+            ));
+            meta.getPersistentDataContainer().set(hostMenuShrinkingZoneDurationAdjustItemKey, PersistentDataType.INTEGER, deltaSeconds);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostShrinkingZoneDurationDisplayItem(Player player) {
+        ItemStack item = new ItemStack(Material.REPEATER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.zone_duration_name"));
+            meta.setLore(trList(player, "host.zone_duration_lore", "seconds", shrinkingZoneDurationSeconds));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack createHostGameSpeedMenuItem(Player player) {
         ItemStack item = new ItemStack(Material.SUGAR);
         ItemMeta meta = item.getItemMeta();
@@ -2081,7 +2316,7 @@ public final class GameManager {
     }
 
     private ItemStack createHostMapMenuItem(Player player) {
-        ItemStack item = new ItemStack(Material.FILLED_MAP);
+        ItemStack item = new ItemStack(getSelectedLobbyArenaIcon());
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(tr(player, "host.map_name"));
@@ -2125,7 +2360,7 @@ public final class GameManager {
     }
 
     private ItemStack createHostArenaCycleItem(Player player) {
-        ItemStack item = new ItemStack(Material.FILLED_MAP);
+        ItemStack item = new ItemStack(getSelectedLobbyArenaIcon());
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(tr(player, "host.map_name"));
@@ -2144,7 +2379,7 @@ public final class GameManager {
     private ItemStack createHostMapSelectionItem(Player player, Arena arena) {
         boolean random = arena == null;
         boolean selected = random ? isRandomLobbyArenaSelected() : arena.getId().equalsIgnoreCase(defaultArenaId);
-        ItemStack item = new ItemStack(random ? Material.COMPASS : Material.FILLED_MAP);
+        ItemStack item = new ItemStack(random ? Material.COMPASS : getArenaMenuIcon(arena));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             String mapName = random ? tr(player, "host.map_random") : arena.getDisplayName();
@@ -2159,6 +2394,28 @@ public final class GameManager {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private Material getSelectedLobbyArenaIcon() {
+        Arena selectedArena = getSelectedLobbyArena();
+        return selectedArena == null ? Material.COMPASS : getArenaMenuIcon(selectedArena);
+    }
+
+    private Material getArenaMenuIcon(Arena arena) {
+        if (arena == null || arena.getId() == null) {
+            return Material.FILLED_MAP;
+        }
+
+        return switch (arena.getId().toLowerCase(Locale.ROOT)) {
+            case "alpha" -> Material.BEDROCK;
+            case "throne" -> Material.GOLD_BLOCK;
+            case "wreckage" -> Material.CRACKED_STONE_BRICKS;
+            case "ring" -> Material.CUT_COPPER;
+            case "frozen_peaks" -> Material.SNOW_BLOCK;
+            case "crystal_cavern" -> Material.AMETHYST_BLOCK;
+            case "trial_chamber" -> Material.TRIAL_SPAWNER;
+            default -> Material.FILLED_MAP;
+        };
     }
 
     private ItemStack createHostAutostartItem(Player player) {
@@ -2286,6 +2543,14 @@ public final class GameManager {
         return String.format(Locale.ROOT, "%d:%02d", minutes, seconds);
     }
 
+    private String formatWholeNumber(double value) {
+        return String.format(Locale.ROOT, "%.0f", value);
+    }
+
+    private String formatDecimal(double value) {
+        return String.format(Locale.ROOT, "%.1f", value);
+    }
+
     private String getHostStatusText(Player player, boolean enabled) {
         return tr(player, enabled ? "host.status_enabled" : "host.status_disabled");
     }
@@ -2314,6 +2579,30 @@ public final class GameManager {
         return tr(player, "host.speed_custom_name", "seconds", Math.max(1, ticks / 20));
     }
 
+    public boolean isShrinkingZoneEnabled() {
+        return shrinkingZoneEnabled;
+    }
+
+    public int getShrinkingZoneStartDelaySeconds() {
+        return shrinkingZoneStartDelaySeconds;
+    }
+
+    public int getShrinkingZoneDurationSeconds() {
+        return shrinkingZoneDurationSeconds;
+    }
+
+    public double getShrinkingZoneMinSize() {
+        return shrinkingZoneMinSize;
+    }
+
+    public double getShrinkingZoneFinalSize() {
+        return SHRINKING_ZONE_FINAL_SIZE;
+    }
+
+    public double getShrinkingZoneDamagePerSecond() {
+        return shrinkingZoneDamagePerSecond;
+    }
+
     private void setLobbyRoundsBeforeReset(int roundsBeforeReset) {
         lobbyRoundsBeforeReset = Math.max(1, roundsBeforeReset);
         for (Arena arena : arenas.values()) {
@@ -2340,11 +2629,17 @@ public final class GameManager {
         suddenNightAlways = false;
         suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
         suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
+        shrinkingZoneEnabled = DEFAULT_SHRINKING_ZONE_ENABLED;
+        shrinkingZoneStartDelaySeconds = DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS;
+        shrinkingZoneDurationSeconds = DEFAULT_SHRINKING_ZONE_DURATION_SECONDS;
+        shrinkingZoneMinSize = DEFAULT_SHRINKING_ZONE_MIN_SIZE;
+        shrinkingZoneDamagePerSecond = DEFAULT_SHRINKING_ZONE_DAMAGE_PER_SECOND;
         setLobbyRoundsBeforeReset(DEFAULT_LOBBY_ROUNDS_BEFORE_RESET);
         setLobbyDropIntervalTicks(DROP_INTERVAL_CLASSIC_TICKS);
         setLobbyAutostartEnabled(true);
         setLobbyArenaSelection(DEFAULT_LOBBY_ARENA_ID);
         refreshSuddenNightSessions();
+        refreshShrinkingZoneSessions();
     }
 
     private void setLobbyArenaSelection(String selectedArenaId) {
@@ -2429,6 +2724,12 @@ public final class GameManager {
         }
         if (!suddenNightEnabled) {
             enforceStaticDaylight();
+        }
+    }
+
+    private void refreshShrinkingZoneSessions() {
+        for (Arena arena : arenas.values()) {
+            arena.restartShrinkingZoneSession();
         }
     }
 

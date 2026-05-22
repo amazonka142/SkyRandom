@@ -1,4 +1,4 @@
-config-version: 4
+config-version: 5
 
 settings:
   prefix: "&b[SkyRandom] &7"
@@ -23,6 +23,11 @@ settings:
   sudden-night-mob-spawning: false
   sudden-night-delay-seconds: 180
   sudden-night-duration-seconds: 180
+  shrinking-zone-enabled: false
+  shrinking-zone-start-delay-seconds: 90
+  shrinking-zone-duration-seconds: 180
+  shrinking-zone-min-size: 32.0
+  shrinking-zone-damage-per-second: 1.0
   drop-interval-ticks: 100
   countdown-seconds: 12
   win-delay-seconds: 0
@@ -332,6 +337,10 @@ loot-table:
         weight: 2
         material: TNT
         amount: 1-2
+      - type: item
+        weight: 2
+        material: FLINT_AND_STEEL
+        amount: 1
       - type: item
         weight: 2
         material: COBWEB
@@ -912,4 +921,177 @@ arenas:
         y: 71.0
         z: 0.5
         yaw: -90.0
+        pitch: 0.0
+  frozen_peaks:
+    display-name: "&bFrozen Peaks"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 58
+    max-build-y: 122
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 375
+        y: -64
+        z: -45
+      max:
+        x: 485
+        y: 130
+        z: 45
+    spawns:
+      - world: skyrandom_void
+        x: 402.5
+        y: 73.0
+        z: -23.5
+        yaw: 35.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 458.5
+        y: 73.0
+        z: -23.5
+        yaw: 145.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 458.5
+        y: 73.0
+        z: 23.5
+        yaw: -145.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 402.5
+        y: 73.0
+        z: 23.5
+        yaw: -35.0
+        pitch: 0.0
+  crystal_cavern:
+    display-name: "&5Crystal Cavern"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 60
+    max-build-y: 77
+    drop-height-offset: 1.5
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 510
+        y: 58
+        z: -45
+      max:
+        x: 630
+        y: 88
+        z: 45
+    spawns:
+      - world: skyrandom_void
+        x: 542.5
+        y: 70.0
+        z: -21.5
+        yaw: 45.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 598.5
+        y: 70.0
+        z: -21.5
+        yaw: 135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 598.5
+        y: 70.0
+        z: 21.5
+        yaw: -135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 542.5
+        y: 70.0
+        z: 21.5
+        yaw: -45.0
+        pitch: 0.0
+  trial_chamber:
+    display-name: "&6Trial Chamber"
+    world: skyrandom_void
+    enabled: true
+    min-players: 2
+    max-players: 4
+    countdown-seconds: 12
+    drop-interval-ticks: 100
+    win-delay-seconds: 5
+    rounds-before-reset: 10
+    round-start-freeze-ticks: 40
+    eliminate-below-y: 60
+    max-build-y: 84
+    drop-height-offset: 3.0
+    allow-place-blocks: true
+    allow-break-map-blocks: false
+    only-break-own-placed-blocks: false
+    waiting-spawn:
+      world: skyrandom_void
+      x: 0.5
+      y: 97.0
+      z: 0.5
+      yaw: 180.0
+      pitch: 0.0
+    region:
+      min:
+        x: 690
+        y: 58
+        z: -32
+      max:
+        x: 770
+        y: 92
+        z: 32
+    spawns:
+      - world: skyrandom_void
+        x: 716.5
+        y: 70.0
+        z: -16.5
+        yaw: 45.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 744.5
+        y: 70.0
+        z: -16.5
+        yaw: 135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 758.5
+        y: 70.0
+        z: 2.5
+        yaw: -135.0
+        pitch: 0.0
+      - world: skyrandom_void
+        x: 713.5
+        y: 70.0
+        z: 13.5
+        yaw: -45.0
         pitch: 0.0

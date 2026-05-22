@@ -1,12 +1,14 @@
 # SkyRandom
 
-SkyRandom is a fast-paced Paper mini-game built for small PvP matches on floating pillars.
+SkyRandom is a fast-paced Paper mini-game built for small PvP matches on floating arenas.
 
 Players join a lobby, get sent into a random arena, and fight through multiple rounds while the game drops random loot above them. Drops can include useful blocks, weak and strong tools, strange utility items, potion effects, mobs, and chaotic surprises.
 
+Version 1.1.0 adds the Frozen Peaks, Crystal Cavern, and Trial Chamber arenas, Flint and Steel drops, and the optional Shrinking Zone BETA modifier.
+
 ## Latest Version
 
-`1.0.1`
+`1.1.0`
 
 ## How Matches Work
 
@@ -42,4 +44,4 @@ Paper 26.1.1 and 26.1.2 were smoke-tested on Java 25.
 
 ## Release Status
 
-SkyRandom 1.0.1 is the latest stable public release and is designed for small Paper servers and quick PvP matches.
+SkyRandom 1.1.0 is the latest stable public release and is designed for small Paper servers and quick PvP matches.

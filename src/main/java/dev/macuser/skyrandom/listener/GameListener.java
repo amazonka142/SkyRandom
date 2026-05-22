@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
@@ -19,6 +20,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
@@ -302,6 +304,16 @@ public final class GameListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onCreatureSpawn(CreatureSpawnEvent event) {
+        if (!(event.getEntity() instanceof Monster)) {
+            return;
+        }
+        if (gameManager.shouldBlockArenaHostileSpawn(event.getLocation(), event.getSpawnReason())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
         Location targetLocation = event.getBlockClicked().getRelative(event.getBlockFace()).getLocation();
         Arena regionArena = gameManager.findArenaByLocation(targetLocation);
@@ -335,6 +347,13 @@ public final class GameListener implements Listener {
             return player;
         }
         return null;
+    }
+
+    private boolean isVanillaHostileSpawn(CreatureSpawnEvent.SpawnReason reason) {
+        return switch (reason) {
+            case NATURAL, PATROL, REINFORCEMENTS -> true;
+            default -> false;
+        };
     }
 
     private boolean tryUseTotem(Player player) {

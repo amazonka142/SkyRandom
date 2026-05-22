@@ -39,6 +39,7 @@ public final class Arena {
     private static final String DROP_ENTRY = ChatColor.GREEN.toString();
     private static final String CLEANUP_ENTRY = ChatColor.GOLD.toString();
     private static final int DEFAULT_CLEANUP_BLOCKS_PER_TICK = 4096;
+    private static final int SHRINKING_ZONE_TASK_PERIOD_TICKS = 20;
 
     private final GameManager manager;
     private final String id;
@@ -86,6 +87,7 @@ public final class Arena {
     private GameState state = GameState.WAITING;
     private BukkitTask countdownTask;
     private BukkitTask dropTask;
+    private BukkitTask shrinkingZoneTask;
     private BukkitTask finishTask;
     private BukkitTask cleanupTask;
     private int countdownRemaining;
@@ -95,6 +97,16 @@ public final class Arena {
     private int currentRound;
     private long roundStartedAtMillis;
     private boolean suddenNightSessionActive;
+    private int shrinkingZoneElapsedTicks;
+    private int shrinkingZoneStartDelayTicks;
+    private int shrinkingZoneDurationTicks;
+    private double shrinkingZoneCurrentSize;
+    private boolean shrinkingZoneStartAnnounced;
+    private boolean shrinkingZoneSecondStartAnnounced;
+    private boolean shrinkingZoneFinalAnnounced;
+    private int lastShrinkingZoneCountdownSeconds = -1;
+    private int lastShrinkingZoneSecondCountdownSeconds = -1;
+    private final Set<UUID> playersOutsideShrinkingZone = new LinkedHashSet<>();
 
     public Arena(
         GameManager manager,
@@ -153,6 +165,7 @@ public final class Arena {
         this.borderCenterX = (region.getMinX() + region.getMaxX()) / 2.0D;
         this.borderCenterZ = (region.getMinZ() + region.getMaxZ()) / 2.0D;
         this.borderSize = Math.max(region.getMaxX() - region.getMinX(), region.getMaxZ() - region.getMinZ());
+        this.shrinkingZoneCurrentSize = borderSize;
         this.playerBoundaryMargin = Math.max(0.0D, playerBoundaryMargin);
         this.playerMaxY = Math.max(region.getMaxY(), maxBuildY) + Math.max(0.0D, playerMaxYMargin);
         for (PlayerLanguage language : PlayerLanguage.values()) {
@@ -215,7 +228,7 @@ public final class Arena {
         this.dropIntervalTicks = Math.max(1, dropIntervalTicks);
         if (state == GameState.RUNNING && dropTask != null) {
             ticksUntilNextDrop = Math.max(1, Math.min(ticksUntilNextDrop, this.dropIntervalTicks));
-            updateDropBar();
+            updateRunningBar();
         }
         updateSidebar();
     }
@@ -226,6 +239,15 @@ public final class Arena {
         }
         endSuddenNightSessionIfNeeded();
         beginSuddenNightSessionIfNeeded();
+    }
+
+    public void restartShrinkingZoneSession() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        stopShrinkingZoneSession(true);
+        startShrinkingZoneIfNeeded();
+        updateRunningBar();
     }
 
     public void reevaluateCountdownState() {
@@ -337,6 +359,7 @@ public final class Arena {
         boolean removedFromRound = activePlayers.remove(playerId);
         boolean removedFromSpectators = spectators.remove(playerId);
         movementLockUntil.remove(playerId);
+        playersOutsideShrinkingZone.remove(playerId);
         if (!removedFromQueue && !removedFromRound && !removedFromSpectators) {
             return;
         }
@@ -379,6 +402,7 @@ public final class Arena {
         activePlayers.remove(playerId);
         spectators.add(playerId);
         movementLockUntil.remove(playerId);
+        playersOutsideShrinkingZone.remove(playerId);
         Player attacker = manager.findRecentAttacker(player);
         if (!isSoloTestRound()) {
             manager.recordDeath(player);
@@ -387,7 +411,7 @@ public final class Arena {
             }
         }
         manager.prepareSpectatorPlayer(player, getSpectatorLocation(player.getLocation()));
-        manager.applyArenaWorldBorder(player, this);
+        applyCurrentWorldBorder(player);
         applyUi(player);
         refreshVisibility();
 
@@ -456,6 +480,7 @@ public final class Arena {
             activePlayers.remove(uuid);
             spectators.remove(uuid);
             movementLockUntil.remove(uuid);
+            playersOutsideShrinkingZone.remove(uuid);
 
             Player player = Bukkit.getPlayer(uuid);
             if (player == null || !player.isOnline()) {
@@ -538,6 +563,11 @@ public final class Arena {
             return true;
         }
 
+        if (isBreakableMapCover(block)) {
+            placedBlocks.remove(key);
+            return true;
+        }
+
         if (owner == null && !changedFromBaseline) {
             sendLocalized(player, "arena.break_map_forbidden");
             return false;
@@ -561,13 +591,17 @@ public final class Arena {
 
             BlockKey key = BlockKey.of(block);
             UUID owner = placedBlocks.get(key);
-            if (allowBreakMapBlocks || owner != null) {
+            if (allowBreakMapBlocks || owner != null || isBreakableMapCover(block)) {
                 placedBlocks.remove(key);
                 continue;
             }
 
             iterator.remove();
         }
+    }
+
+    private boolean isBreakableMapCover(Block block) {
+        return block != null && block.getType() == Material.SNOW;
     }
 
     public Location getDropLocation(Location playerLocation) {
@@ -734,7 +768,7 @@ public final class Arena {
             currentRoundParticipants.add(uuid);
             manager.prepareMatchPlayer(player);
             player.teleport(shuffledSpawns.get(index++).clone());
-            manager.applyArenaWorldBorder(player, this);
+            applyCurrentWorldBorder(player);
             player.setNoDamageTicks(60);
             lockMovement(player);
             player.sendTitle(
@@ -767,18 +801,23 @@ public final class Arena {
             checkForWinner();
             return;
         }
+        startShrinkingZoneIfNeeded();
         startDrops();
     }
 
     private void startDrops() {
         if (dropIntervalTicks <= 0 || manager.getDropTable().isEmpty()) {
-            setBarsVisible(false);
+            if (shrinkingZoneTask == null) {
+                setBarsVisible(false);
+            } else {
+                updateRunningBar();
+            }
             updateSidebar();
             return;
         }
 
         ticksUntilNextDrop = dropIntervalTicks;
-        updateDropBar();
+        updateRunningBar();
 
         dropTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
             manager.getPlugin(),
@@ -799,7 +838,7 @@ public final class Arena {
                     ticksUntilNextDrop = dropIntervalTicks;
                 }
 
-                updateDropBar();
+                updateRunningBar();
             },
             1L,
             1L
@@ -826,6 +865,7 @@ public final class Arena {
             dropTask = null;
         }
         endSuddenNightSessionIfNeeded();
+        stopShrinkingZoneSession(true);
         updateBarsAppearance(BarColor.PURPLE, 1.0D, null, false);
 
         if (activePlayers.isEmpty()) {
@@ -887,6 +927,7 @@ public final class Arena {
 
     private void finishRound() {
         endSuddenNightSessionIfNeeded();
+        stopShrinkingZoneSession(true);
         boolean reachedResetRound = currentRound >= roundsBeforeReset;
         if (reachedResetRound) {
             startArenaRegionCleanup(() -> completeRound(true));
@@ -905,6 +946,7 @@ public final class Arena {
         activePlayers.clear();
         spectators.clear();
         movementLockUntil.clear();
+        playersOutsideShrinkingZone.clear();
         state = GameState.WAITING;
         countdownRemaining = 0;
         ticksUntilNextDrop = 0;
@@ -912,6 +954,7 @@ public final class Arena {
         intermissionDurationSeconds = 0;
         roundStartedAtMillis = 0L;
         currentRoundParticipants.clear();
+        resetShrinkingZoneState();
 
         if (reachedResetRound) {
             manager.rotateRandomQueuePlayers(this);
@@ -944,6 +987,7 @@ public final class Arena {
     private void resetArena(boolean cleanupBlocks) {
         cancelAllTasks();
         endSuddenNightSessionIfNeeded();
+        stopShrinkingZoneSession(false);
         if (cleanupBlocks) {
             restoreArenaRegion();
         }
@@ -959,6 +1003,7 @@ public final class Arena {
         currentRound = 0;
         roundStartedAtMillis = 0L;
         currentRoundParticipants.clear();
+        resetShrinkingZoneState();
         for (ArenaUiBundle bundle : uiBundles.values()) {
             bundle.bar().removeAll();
             bundle.bar().setVisible(false);
@@ -976,6 +1021,7 @@ public final class Arena {
             activePlayers.remove(uuid);
             spectators.remove(uuid);
             movementLockUntil.remove(uuid);
+            playersOutsideShrinkingZone.remove(uuid);
             manager.unbindOffline(uuid);
             manager.discardSnapshot(uuid);
         }
@@ -989,6 +1035,10 @@ public final class Arena {
         if (dropTask != null) {
             dropTask.cancel();
             dropTask = null;
+        }
+        if (shrinkingZoneTask != null) {
+            shrinkingZoneTask.cancel();
+            shrinkingZoneTask = null;
         }
         if (finishTask != null) {
             finishTask.cancel();
@@ -1029,6 +1079,19 @@ public final class Arena {
         updateSidebar();
     }
 
+    private void updateRunningBar() {
+        if (shrinkingZoneTask != null) {
+            updateShrinkingZoneBar();
+            return;
+        }
+        if (dropTask != null && dropIntervalTicks > 0 && !manager.getDropTable().isEmpty()) {
+            updateDropBar();
+            return;
+        }
+        setBarsVisible(false);
+        updateSidebar();
+    }
+
     private void updateDropBar() {
         int seconds = Math.max(1, (int) Math.ceil(ticksUntilNextDrop / 20.0D));
         double progress = dropIntervalTicks <= 0 ? 1.0D : ticksUntilNextDrop / (double) dropIntervalTicks;
@@ -1066,6 +1129,287 @@ public final class Arena {
             "percent", percent
         );
         updateSidebar();
+    }
+
+    private void startShrinkingZoneIfNeeded() {
+        if (!manager.isShrinkingZoneEnabled()) {
+            resetShrinkingZoneState();
+            return;
+        }
+        if (shrinkingZoneTask != null) {
+            return;
+        }
+
+        resetShrinkingZoneState();
+        shrinkingZoneStartDelayTicks = Math.max(0, manager.getShrinkingZoneStartDelaySeconds() * 20);
+        shrinkingZoneDurationTicks = Math.max(SHRINKING_ZONE_TASK_PERIOD_TICKS, manager.getShrinkingZoneDurationSeconds() * 20);
+        shrinkingZoneCurrentSize = borderSize;
+        applyShrinkingZoneWorldBorder();
+
+        if (shrinkingZoneStartDelayTicks > 0) {
+            lastShrinkingZoneCountdownSeconds = shrinkingZoneStartDelayTicks / 20;
+            broadcastLocalized("arena.shrinking_zone_countdown", "seconds", lastShrinkingZoneCountdownSeconds);
+        }
+
+        shrinkingZoneTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
+            manager.getPlugin(),
+            () -> {
+                if (state != GameState.RUNNING) {
+                    stopShrinkingZoneSession(true);
+                    return;
+                }
+
+                updateShrinkingZoneState();
+                shrinkingZoneElapsedTicks += SHRINKING_ZONE_TASK_PERIOD_TICKS;
+            },
+            0L,
+            SHRINKING_ZONE_TASK_PERIOD_TICKS
+        );
+    }
+
+    private void updateShrinkingZoneState() {
+        shrinkingZoneCurrentSize = calculateShrinkingZoneSize();
+        announceShrinkingZoneState();
+        applyShrinkingZoneWorldBorder();
+        if (isShrinkingZoneDamaging()) {
+            damagePlayersOutsideShrinkingZone();
+        }
+        updateShrinkingZoneBar();
+    }
+
+    private double calculateShrinkingZoneSize() {
+        double firstTargetSize = getShrinkingZoneFirstTargetSize();
+        double finalTargetSize = getShrinkingZoneFinalSize();
+        int firstShrinkStartTick = getFirstShrinkStartTick();
+        int firstShrinkEndTick = getFirstShrinkEndTick();
+        int secondShrinkStartTick = getSecondShrinkStartTick();
+        int secondShrinkEndTick = getSecondShrinkEndTick();
+
+        if (shrinkingZoneElapsedTicks < firstShrinkStartTick) {
+            return borderSize;
+        }
+        if (shrinkingZoneElapsedTicks < firstShrinkEndTick) {
+            double progress = getProgress(shrinkingZoneElapsedTicks - firstShrinkStartTick, shrinkingZoneDurationTicks);
+            return interpolate(borderSize, firstTargetSize, progress);
+        }
+        if (shrinkingZoneElapsedTicks < secondShrinkStartTick) {
+            return firstTargetSize;
+        }
+        if (shrinkingZoneElapsedTicks < secondShrinkEndTick) {
+            double progress = getProgress(shrinkingZoneElapsedTicks - secondShrinkStartTick, shrinkingZoneDurationTicks);
+            return interpolate(firstTargetSize, finalTargetSize, progress);
+        }
+        return finalTargetSize;
+    }
+
+    private double getProgress(int elapsedTicks, int durationTicks) {
+        return durationTicks <= 0
+            ? 1.0D
+            : Math.max(0.0D, Math.min(1.0D, elapsedTicks / (double) durationTicks));
+    }
+
+    private double interpolate(double from, double to, double progress) {
+        return from - ((from - to) * progress);
+    }
+
+    private double getShrinkingZoneFirstTargetSize() {
+        return Math.max(getShrinkingZoneFinalSize(), Math.min(borderSize, manager.getShrinkingZoneMinSize()));
+    }
+
+    private double getShrinkingZoneFinalSize() {
+        return Math.max(1.0D, Math.min(borderSize, manager.getShrinkingZoneFinalSize()));
+    }
+
+    private int getFirstShrinkStartTick() {
+        return shrinkingZoneStartDelayTicks;
+    }
+
+    private int getFirstShrinkEndTick() {
+        return getFirstShrinkStartTick() + shrinkingZoneDurationTicks;
+    }
+
+    private int getSecondShrinkStartTick() {
+        return getFirstShrinkEndTick() + shrinkingZoneStartDelayTicks;
+    }
+
+    private int getSecondShrinkEndTick() {
+        return getSecondShrinkStartTick() + shrinkingZoneDurationTicks;
+    }
+
+    private void announceShrinkingZoneState() {
+        int firstShrinkStartTick = getFirstShrinkStartTick();
+        int secondShrinkStartTick = getSecondShrinkStartTick();
+        int secondShrinkEndTick = getSecondShrinkEndTick();
+        int secondsUntilStart = Math.max(0, (int) Math.ceil((firstShrinkStartTick - shrinkingZoneElapsedTicks) / 20.0D));
+        if (shrinkingZoneElapsedTicks < firstShrinkStartTick
+            && shouldAnnounceShrinkingZoneCountdown(secondsUntilStart)
+            && secondsUntilStart != lastShrinkingZoneCountdownSeconds) {
+            lastShrinkingZoneCountdownSeconds = secondsUntilStart;
+            broadcastLocalized("arena.shrinking_zone_countdown", "seconds", secondsUntilStart);
+            return;
+        }
+
+        if (!shrinkingZoneStartAnnounced && shrinkingZoneElapsedTicks >= firstShrinkStartTick) {
+            shrinkingZoneStartAnnounced = true;
+            broadcastLocalized("arena.shrinking_zone_started");
+            playArenaSound(Sound.BLOCK_BEACON_DEACTIVATE, 0.7F, 1.3F);
+        }
+
+        if (shrinkingZoneElapsedTicks >= getFirstShrinkEndTick() && shrinkingZoneElapsedTicks < secondShrinkStartTick) {
+            int secondsUntilSecondShrink = Math.max(0, (int) Math.ceil((secondShrinkStartTick - shrinkingZoneElapsedTicks) / 20.0D));
+            if ((lastShrinkingZoneSecondCountdownSeconds < 0 || shouldAnnounceShrinkingZoneCountdown(secondsUntilSecondShrink))
+                && secondsUntilSecondShrink != lastShrinkingZoneSecondCountdownSeconds) {
+                lastShrinkingZoneSecondCountdownSeconds = secondsUntilSecondShrink;
+                broadcastLocalized("arena.shrinking_zone_second_countdown", "seconds", secondsUntilSecondShrink);
+            }
+            return;
+        }
+
+        if (!shrinkingZoneSecondStartAnnounced && shrinkingZoneElapsedTicks >= secondShrinkStartTick) {
+            shrinkingZoneSecondStartAnnounced = true;
+            broadcastLocalized("arena.shrinking_zone_final_started");
+            playArenaSound(Sound.BLOCK_BEACON_DEACTIVATE, 0.8F, 0.9F);
+        }
+
+        if (!shrinkingZoneFinalAnnounced && shrinkingZoneElapsedTicks >= secondShrinkEndTick) {
+            shrinkingZoneFinalAnnounced = true;
+            broadcastLocalized("arena.shrinking_zone_final");
+        }
+    }
+
+    private boolean shouldAnnounceShrinkingZoneCountdown(int secondsUntilStart) {
+        return secondsUntilStart == 30 || secondsUntilStart == 10 || secondsUntilStart == 5;
+    }
+
+    private boolean isShrinkingZoneDamaging() {
+        return shrinkingZoneTask != null && shrinkingZoneElapsedTicks >= shrinkingZoneStartDelayTicks;
+    }
+
+    private void damagePlayersOutsideShrinkingZone() {
+        double damage = manager.getShrinkingZoneDamagePerSecond();
+        for (UUID uuid : List.copyOf(activePlayers)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+
+            if (isInsideShrinkingZone(player.getLocation())) {
+                playersOutsideShrinkingZone.remove(uuid);
+                continue;
+            }
+
+            if (playersOutsideShrinkingZone.add(uuid)) {
+                sendLocalized(player, "arena.shrinking_zone_outside");
+                player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, SoundCategory.MASTER, 0.7F, 0.8F);
+            }
+
+            if (damage <= 0.0D) {
+                continue;
+            }
+            if (player.getHealth() <= damage) {
+                eliminate(player, "reason.shrinking_zone");
+                continue;
+            }
+            player.damage(damage);
+        }
+    }
+
+    private boolean isInsideShrinkingZone(Location location) {
+        if (location == null || !isWorld(location.getWorld())) {
+            return false;
+        }
+        double halfSize = Math.max(0.5D, shrinkingZoneCurrentSize / 2.0D);
+        return Math.abs(location.getX() - borderCenterX) <= halfSize
+            && Math.abs(location.getZ() - borderCenterZ) <= halfSize;
+    }
+
+    private void updateShrinkingZoneBar() {
+        int firstShrinkStartTick = getFirstShrinkStartTick();
+        int firstShrinkEndTick = getFirstShrinkEndTick();
+        int secondShrinkStartTick = getSecondShrinkStartTick();
+        if (shrinkingZoneElapsedTicks < firstShrinkStartTick) {
+            int seconds = Math.max(0, (int) Math.ceil((firstShrinkStartTick - shrinkingZoneElapsedTicks) / 20.0D));
+            double progress = shrinkingZoneStartDelayTicks <= 0
+                ? 1.0D
+                : Math.max(0.0D, Math.min(1.0D, (firstShrinkStartTick - shrinkingZoneElapsedTicks) / (double) shrinkingZoneStartDelayTicks));
+            updateBarsAppearance(BarColor.YELLOW, progress, "bossbar.zone_waiting", true, "seconds", seconds);
+            updateSidebar();
+            return;
+        }
+        if (shrinkingZoneElapsedTicks >= firstShrinkEndTick && shrinkingZoneElapsedTicks < secondShrinkStartTick) {
+            int seconds = Math.max(0, (int) Math.ceil((secondShrinkStartTick - shrinkingZoneElapsedTicks) / 20.0D));
+            double progress = shrinkingZoneStartDelayTicks <= 0
+                ? 1.0D
+                : Math.max(0.0D, Math.min(1.0D, (secondShrinkStartTick - shrinkingZoneElapsedTicks) / (double) shrinkingZoneStartDelayTicks));
+            updateBarsAppearance(BarColor.YELLOW, progress, "bossbar.zone_next", true, "seconds", seconds);
+            updateSidebar();
+            return;
+        }
+
+        int size = Math.max(1, (int) Math.round(shrinkingZoneCurrentSize));
+        double progress = borderSize <= 0.0D
+            ? 1.0D
+            : Math.max(0.0D, Math.min(1.0D, shrinkingZoneCurrentSize / borderSize));
+        updateBarsAppearance(
+            BarColor.RED,
+            progress,
+            shrinkingZoneFinalAnnounced ? "bossbar.zone_final" : "bossbar.zone_shrinking",
+            true,
+            "size", size
+        );
+        updateSidebar();
+    }
+
+    private void stopShrinkingZoneSession(boolean restoreWorldBorder) {
+        if (shrinkingZoneTask != null) {
+            shrinkingZoneTask.cancel();
+            shrinkingZoneTask = null;
+        }
+        resetShrinkingZoneState();
+        if (restoreWorldBorder) {
+            applyFullWorldBorderToRoundPlayers();
+        }
+    }
+
+    private void resetShrinkingZoneState() {
+        shrinkingZoneElapsedTicks = 0;
+        shrinkingZoneStartDelayTicks = 0;
+        shrinkingZoneDurationTicks = 0;
+        shrinkingZoneCurrentSize = borderSize;
+        shrinkingZoneStartAnnounced = false;
+        shrinkingZoneSecondStartAnnounced = false;
+        shrinkingZoneFinalAnnounced = false;
+        lastShrinkingZoneCountdownSeconds = -1;
+        lastShrinkingZoneSecondCountdownSeconds = -1;
+        playersOutsideShrinkingZone.clear();
+    }
+
+    private void applyCurrentWorldBorder(Player player) {
+        manager.applyArenaWorldBorder(player, this, shrinkingZoneCurrentSize);
+    }
+
+    private void applyShrinkingZoneWorldBorder() {
+        for (UUID uuid : players) {
+            if (!activePlayers.contains(uuid) && !spectators.contains(uuid)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                applyCurrentWorldBorder(player);
+            }
+        }
+    }
+
+    private void applyFullWorldBorderToRoundPlayers() {
+        for (UUID uuid : players) {
+            if (!activePlayers.contains(uuid) && !spectators.contains(uuid)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                manager.applyArenaWorldBorder(player, this);
+            }
+        }
     }
 
     private int getIntermissionDelaySeconds() {
@@ -1243,8 +1587,8 @@ public final class Arena {
             updateWaitingBar();
         } else if (state == GameState.COUNTDOWN) {
             updateCountdownBar();
-        } else if (state == GameState.RUNNING && dropTask != null) {
-            updateDropBar();
+        } else if (state == GameState.RUNNING) {
+            updateRunningBar();
         } else if (state == GameState.ENDING) {
             updateIntermissionBar();
         }
