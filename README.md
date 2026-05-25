@@ -2,6 +2,8 @@
 
 SkyRandom is a fast-paced Paper mini-game built for small PvP matches on floating arenas.
 
+SkyRandom reached 100+ total downloads across Modrinth and CurseForge!
+
 Players join a lobby, get sent into a random arena, and fight through multiple rounds while the game drops random loot above them. Drops can include useful blocks, weak and strong tools, strange utility items, potion effects, mobs, and chaotic surprises.
 
 Version 1.1.0 adds the Frozen Peaks, Crystal Cavern, and Trial Chamber arenas, Flint and Steel drops, and the optional Shrinking Zone BETA modifier.
