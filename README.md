@@ -2,7 +2,7 @@
 
 SkyRandom is a fast-paced Paper mini-game built for small PvP matches on floating arenas.
 
-SkyRandom reached 100+ total downloads across Modrinth and CurseForge!
+SkyRandom reached 100+ total downloads across [Modrinth](https://modrinth.com/plugin/skyrandom/versions) and [CurseForge](https://www.curseforge.com/minecraft/bukkit-plugins/skyrandom/files/all?page=1&pageSize=20&showAlphaFiles=hide)!
 
 Players join a lobby, get sent into a random arena, and fight through multiple rounds while the game drops random loot above them. Drops can include useful blocks, weak and strong tools, strange utility items, potion effects, mobs, and chaotic surprises.
 
