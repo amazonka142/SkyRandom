@@ -12,7 +12,7 @@ Version 1.1.0 adds the Frozen Peaks, Crystal Cavern, and Trial Chamber arenas, F
 
 Latest stable: `1.1.0`
 
-Latest beta: `1.2.0-beta.1`
+Latest beta: `1.2.0-beta.1 (soon)`
 
 ## How Matches Work
 
