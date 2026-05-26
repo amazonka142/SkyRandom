@@ -10,7 +10,9 @@ Version 1.1.0 adds the Frozen Peaks, Crystal Cavern, and Trial Chamber arenas, F
 
 ## Latest Version
 
-`1.1.0`
+Latest stable: `1.1.0`
+
+Latest beta: `1.2.0-beta.1`
 
 ## How Matches Work
 
@@ -47,3 +49,5 @@ Paper 26.1.1 and 26.1.2 were smoke-tested on Java 25.
 ## Release Status
 
 SkyRandom 1.1.0 is the latest stable public release and is designed for small Paper servers and quick PvP matches.
+
+SkyRandom 1.2.0-beta.1 is the current beta line for testing the next feature update.
