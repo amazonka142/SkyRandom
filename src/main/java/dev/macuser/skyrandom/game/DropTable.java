@@ -34,6 +34,9 @@ public final class DropTable {
     private static final DropTable EMPTY = new DropTable(List.of());
     private static final int REROLL_ATTEMPTS = 10;
     private static final int RECENT_HISTORY_SIZE = 3;
+    private static final double RANDOM_ENCHANT_CHANCE = 0.14D;
+    private static final double EXTRA_RANDOM_ENCHANT_CHANCE = 0.28D;
+    private static final int MAX_RANDOM_ENCHANTS = 3;
     private static final Set<Material> BLOCKED_RANDOM_BLOCKS = Set.of(
         Material.BEDROCK,
         Material.BARRIER,
@@ -48,12 +51,18 @@ public final class DropTable {
     private static final List<Material> DEFAULT_RANDOM_BLOCK_POOL = buildDefaultRandomBlockPool();
 
     private final List<DropGroup> groups;
+    private final List<DropGroup> rareGroups;
     private final double totalWeight;
+    private final double rareTotalWeight;
     private final Map<java.util.UUID, Deque<String>> recentDropsByPlayer = new HashMap<>();
 
     private DropTable(List<DropGroup> groups) {
         this.groups = List.copyOf(groups);
+        this.rareGroups = groups.stream()
+            .filter(group -> isRareGroup(group.key()))
+            .toList();
         this.totalWeight = groups.stream().mapToDouble(DropGroup::weight).sum();
+        this.rareTotalWeight = rareGroups.stream().mapToDouble(DropGroup::weight).sum();
     }
 
     public static DropTable empty() {
@@ -107,7 +116,23 @@ public final class DropTable {
     }
 
     public void roll(Player player, Arena arena) {
-        if (groups.isEmpty()) {
+        rollFromGroups(player, arena, groups, totalWeight);
+    }
+
+    public boolean hasRareDrops() {
+        return !rareGroups.isEmpty();
+    }
+
+    public void rollRare(Player player, Arena arena) {
+        if (rareGroups.isEmpty()) {
+            roll(player, arena);
+            return;
+        }
+        rollFromGroups(player, arena, rareGroups, rareTotalWeight);
+    }
+
+    private void rollFromGroups(Player player, Arena arena, List<DropGroup> sourceGroups, double sourceWeight) {
+        if (sourceGroups.isEmpty() || sourceWeight <= 0.0D) {
             return;
         }
 
@@ -115,7 +140,7 @@ public final class DropTable {
         DropAction fallback = null;
 
         for (int attempt = 0; attempt < REROLL_ATTEMPTS; attempt++) {
-            DropGroup group = pickWeighted(groups, totalWeight);
+            DropGroup group = pickWeighted(sourceGroups, sourceWeight);
             if (group == null) {
                 return;
             }
@@ -140,6 +165,14 @@ public final class DropTable {
             fallback.apply(player, arena);
             rememberDrop(recent, fallback.key());
         }
+    }
+
+    private static boolean isRareGroup(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.toLowerCase(Locale.ROOT);
+        return normalized.contains("rare") || "gear".equals(normalized) || normalized.contains("lucky");
     }
 
     private static DropAction parseEntry(ConfigurationSection section, Logger logger) {
@@ -438,11 +471,10 @@ public final class DropTable {
                 if (customName != null && !customName.isBlank()) {
                     meta.displayName(LEGACY.deserialize(customName));
                 }
-                for (Map.Entry<Enchantment, Integer> enchantmentEntry : enchantments.entrySet()) {
+                Map<Enchantment, Integer> appliedEnchantments = new LinkedHashMap<>(enchantments);
+                addRandomEnchantments(material, appliedEnchantments);
+                for (Map.Entry<Enchantment, Integer> enchantmentEntry : appliedEnchantments.entrySet()) {
                     meta.addEnchant(enchantmentEntry.getKey(), enchantmentEntry.getValue(), true);
-                }
-                if (!enchantments.isEmpty()) {
-                    meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
                 }
                 itemStack.setItemMeta(meta);
             }
@@ -450,6 +482,87 @@ public final class DropTable {
             giveOrDrop(player, arena, itemStack, rolledAmount);
             arena.sendLocalized(player, "drop.item", "item", prettify(material.name()), "amount", rolledAmount);
         }
+    }
+
+    private static void addRandomEnchantments(Material material, Map<Enchantment, Integer> enchantments) {
+        if (ThreadLocalRandom.current().nextDouble() >= RANDOM_ENCHANT_CHANCE) {
+            return;
+        }
+
+        List<RandomEnchantOption> options = randomEnchantOptions(material);
+        if (options.isEmpty()) {
+            return;
+        }
+
+        java.util.Collections.shuffle(options);
+        int added = 0;
+        for (RandomEnchantOption option : options) {
+            if (added > 0 && ThreadLocalRandom.current().nextDouble() >= EXTRA_RANDOM_ENCHANT_CHANCE) {
+                break;
+            }
+            if (added >= MAX_RANDOM_ENCHANTS) {
+                break;
+            }
+
+            Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(option.key()));
+            if (enchantment == null || enchantments.containsKey(enchantment)) {
+                continue;
+            }
+
+            enchantments.put(enchantment, option.rollLevel());
+            added++;
+        }
+    }
+
+    private static List<RandomEnchantOption> randomEnchantOptions(Material material) {
+        if (material == null) {
+            return List.of();
+        }
+
+        String name = material.name();
+        if (name.endsWith("_SWORD")) {
+            return List.of(
+                new RandomEnchantOption("sharpness", 1, 4),
+                new RandomEnchantOption("knockback", 1, 2),
+                new RandomEnchantOption("fire_aspect", 1, 2),
+                new RandomEnchantOption("sweeping_edge", 1, 3),
+                new RandomEnchantOption("unbreaking", 1, 3)
+            );
+        }
+        if (name.endsWith("_PICKAXE")) {
+            return List.of(
+                new RandomEnchantOption("efficiency", 1, 4),
+                new RandomEnchantOption("fortune", 1, 3),
+                new RandomEnchantOption("unbreaking", 1, 3),
+                new RandomEnchantOption("silk_touch", 1, 1)
+            );
+        }
+        if (name.endsWith("_AXE")) {
+            return List.of(
+                new RandomEnchantOption("sharpness", 1, 4),
+                new RandomEnchantOption("efficiency", 1, 4),
+                new RandomEnchantOption("unbreaking", 1, 3),
+                new RandomEnchantOption("knockback", 1, 2)
+            );
+        }
+        if (name.endsWith("_SHOVEL")) {
+            return List.of(
+                new RandomEnchantOption("efficiency", 1, 4),
+                new RandomEnchantOption("fortune", 1, 3),
+                new RandomEnchantOption("unbreaking", 1, 3),
+                new RandomEnchantOption("silk_touch", 1, 1)
+            );
+        }
+        if (material == Material.MACE) {
+            return List.of(
+                new RandomEnchantOption("density", 1, 4),
+                new RandomEnchantOption("breach", 1, 4),
+                new RandomEnchantOption("wind_burst", 1, 2),
+                new RandomEnchantOption("unbreaking", 1, 3)
+            );
+        }
+
+        return List.of();
     }
 
     private record BundleDrop(double weight, String bundleKey, List<ItemDrop> itemDrops) implements DropAction {
@@ -567,6 +680,27 @@ public final class DropTable {
 
         private int roll() {
             return min == max ? min : ThreadLocalRandom.current().nextInt(min, max + 1);
+        }
+    }
+
+    private record RandomEnchantOption(String key, int minLevel, int maxLevel) {
+
+        private int rollLevel() {
+            int min = Math.max(1, minLevel);
+            int max = Math.max(min, maxLevel);
+            int totalWeight = 0;
+            for (int level = min; level <= max; level++) {
+                totalWeight += max - level + 1;
+            }
+
+            int roll = ThreadLocalRandom.current().nextInt(totalWeight);
+            for (int level = min; level <= max; level++) {
+                roll -= max - level + 1;
+                if (roll < 0) {
+                    return level;
+                }
+            }
+            return min;
         }
     }
 

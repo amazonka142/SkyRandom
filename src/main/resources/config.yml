@@ -24,6 +24,7 @@ settings:
   sudden-night-delay-seconds: 180
   sudden-night-duration-seconds: 180
   shrinking-zone-enabled: false
+  random-events-enabled: false
   shrinking-zone-start-delay-seconds: 90
   shrinking-zone-duration-seconds: 180
   shrinking-zone-min-size: 32.0
@@ -675,6 +676,11 @@ loot-table:
         material: WIND_CHARGE
         amount: 2-4
         name: "&6Ultra Wind Charge"
+      - type: item
+        weight: 0.25
+        material: MACE
+        amount: 1
+        name: "&6Ultra Mace"
       - type: item
         weight: 0.12
         material: ENCHANTED_GOLDEN_APPLE

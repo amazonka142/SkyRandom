@@ -71,6 +71,7 @@ public final class GameManager {
     private static final int DEFAULT_SUDDEN_NIGHT_DURATION_SECONDS = 180;
     private static final boolean DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING = false;
     private static final boolean DEFAULT_SHRINKING_ZONE_ENABLED = false;
+    private static final boolean DEFAULT_RANDOM_EVENTS_ENABLED = false;
     private static final int DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS = 90;
     private static final int DEFAULT_SHRINKING_ZONE_DURATION_SECONDS = 180;
     private static final double DEFAULT_SHRINKING_ZONE_MIN_SIZE = 32.0D;
@@ -113,6 +114,7 @@ public final class GameManager {
     private final NamespacedKey hostMenuToggleSuddenNightMobsItemKey;
     private final NamespacedKey hostMenuSuddenNightDelayAdjustItemKey;
     private final NamespacedKey hostMenuToggleShrinkingZoneItemKey;
+    private final NamespacedKey hostMenuToggleRandomEventsItemKey;
     private final NamespacedKey hostMenuShrinkingZoneDelayAdjustItemKey;
     private final NamespacedKey hostMenuShrinkingZoneDurationAdjustItemKey;
     private final NamespacedKey hostMenuDropIntervalItemKey;
@@ -136,6 +138,7 @@ public final class GameManager {
     private boolean suddenNightAlways = false;
     private boolean suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
     private boolean shrinkingZoneEnabled = DEFAULT_SHRINKING_ZONE_ENABLED;
+    private boolean randomEventsEnabled = DEFAULT_RANDOM_EVENTS_ENABLED;
     private String defaultArenaId = "random";
     private int lobbyProtectionRadius = 12;
     private int lobbyProtectionBelow = 14;
@@ -175,6 +178,7 @@ public final class GameManager {
         this.hostMenuToggleSuddenNightMobsItemKey = new NamespacedKey(plugin, "host_menu_toggle_sudden_night_mobs");
         this.hostMenuSuddenNightDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_sudden_night_delay_adjust");
         this.hostMenuToggleShrinkingZoneItemKey = new NamespacedKey(plugin, "host_menu_toggle_shrinking_zone");
+        this.hostMenuToggleRandomEventsItemKey = new NamespacedKey(plugin, "host_menu_toggle_random_events");
         this.hostMenuShrinkingZoneDelayAdjustItemKey = new NamespacedKey(plugin, "host_menu_shrinking_zone_delay_adjust");
         this.hostMenuShrinkingZoneDurationAdjustItemKey = new NamespacedKey(plugin, "host_menu_shrinking_zone_duration_adjust");
         this.hostMenuDropIntervalItemKey = new NamespacedKey(plugin, "host_menu_drop_interval");
@@ -217,6 +221,9 @@ public final class GameManager {
         this.shrinkingZoneEnabled = settings != null
             ? settings.getBoolean("shrinking-zone-enabled", DEFAULT_SHRINKING_ZONE_ENABLED)
             : DEFAULT_SHRINKING_ZONE_ENABLED;
+        this.randomEventsEnabled = settings != null
+            ? settings.getBoolean("random-events-enabled", DEFAULT_RANDOM_EVENTS_ENABLED)
+            : DEFAULT_RANDOM_EVENTS_ENABLED;
         this.shrinkingZoneStartDelaySeconds = settings != null
             ? Math.max(0, settings.getInt("shrinking-zone-start-delay-seconds", DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS))
             : DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS;
@@ -1381,6 +1388,7 @@ public final class GameManager {
         inventory.setItem(30, createHostGameSpeedMenuItem(player));
         inventory.setItem(32, createHostAutostartItem(player));
         inventory.setItem(34, createHostShrinkingZoneMenuItem(player));
+        inventory.setItem(29, createHostRandomEventsItem(player));
         inventory.setItem(31, createHostTransferItem(player));
         inventory.setItem(42, createHostResetDefaultsItem(player));
         inventory.setItem(40, createBackItem(player));
@@ -1402,6 +1410,20 @@ public final class GameManager {
         inventory.setItem(14, createHostSuddenNightDelayAdjustItem(player, 1));
         inventory.setItem(15, createHostSuddenNightMobsItem(player));
         inventory.setItem(16, createHostSuddenNightAlwaysItem(player));
+        inventory.setItem(22, createBackItem(player));
+        player.openInventory(inventory);
+    }
+
+    public void openHostRandomEventsMenu(Player player) {
+        if (!isLobbyHost(player)) {
+            sendLocalized(player, "host.not_host");
+            return;
+        }
+
+        HostMenuHolder holder = new HostMenuHolder(HostMenuHolder.Section.RANDOM_EVENTS);
+        Inventory inventory = Bukkit.createInventory(holder, 27, tr(player, "host.random_events_menu_title"));
+        holder.setInventory(inventory);
+        inventory.setItem(13, createHostRandomEventsToggleItem(player));
         inventory.setItem(22, createBackItem(player));
         player.openInventory(inventory);
     }
@@ -1572,6 +1594,7 @@ public final class GameManager {
                 case "game_speed" -> openHostGameSpeedMenu(player);
                 case "map_selection" -> openHostMapSelectionMenu(player);
                 case "shrinking_zone" -> openHostShrinkingZoneMenu(player);
+                case "random_events" -> openHostRandomEventsMenu(player);
                 default -> {
                 }
             }
@@ -1622,6 +1645,14 @@ public final class GameManager {
             refreshShrinkingZoneSessions();
             sendLocalized(player, "host.zone_changed", "status", getHostStatusText(player, shrinkingZoneEnabled));
             openHostShrinkingZoneMenu(player);
+            return;
+        }
+
+        if (meta.getPersistentDataContainer().has(hostMenuToggleRandomEventsItemKey, PersistentDataType.BYTE)) {
+            randomEventsEnabled = !randomEventsEnabled;
+            refreshRandomEventSessions();
+            sendLocalized(player, "host.random_events_changed", "status", getHostStatusText(player, randomEventsEnabled));
+            openHostRandomEventsMenu(player);
             return;
         }
 
@@ -2223,6 +2254,42 @@ public final class GameManager {
         return item;
     }
 
+    private ItemStack createHostRandomEventsItem(Player player) {
+        ItemStack item = new ItemStack(Material.AMETHYST_SHARD);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.random_events_settings_name"));
+            meta.setLore(trList(
+                player,
+                "host.random_events_settings_lore",
+                "status", getHostStatusText(player, randomEventsEnabled),
+                "action", tr(player, "host.click_open")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuOpenSubmenuItemKey, PersistentDataType.STRING, "random_events");
+            addSelectedGlow(meta, randomEventsEnabled);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createHostRandomEventsToggleItem(Player player) {
+        ItemStack item = new ItemStack(randomEventsEnabled ? Material.LIME_DYE : Material.GRAY_DYE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(tr(player, "host.random_events_toggle_name"));
+            meta.setLore(trList(
+                player,
+                "host.random_events_toggle_lore",
+                "status", getHostStatusText(player, randomEventsEnabled),
+                "action", tr(player, "host.click_toggle")
+            ));
+            meta.getPersistentDataContainer().set(hostMenuToggleRandomEventsItemKey, PersistentDataType.BYTE, (byte) 1);
+            addSelectedGlow(meta, randomEventsEnabled);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack createHostShrinkingZoneDelayAdjustItem(Player player, int deltaSeconds) {
         ItemStack item = new ItemStack(deltaSeconds > 0 ? Material.LIME_DYE : Material.RED_DYE);
         ItemMeta meta = item.getItemMeta();
@@ -2603,6 +2670,10 @@ public final class GameManager {
         return shrinkingZoneDamagePerSecond;
     }
 
+    public boolean isRandomEventsEnabled() {
+        return randomEventsEnabled;
+    }
+
     private void setLobbyRoundsBeforeReset(int roundsBeforeReset) {
         lobbyRoundsBeforeReset = Math.max(1, roundsBeforeReset);
         for (Arena arena : arenas.values()) {
@@ -2630,6 +2701,7 @@ public final class GameManager {
         suddenNightMobSpawning = DEFAULT_SUDDEN_NIGHT_MOB_SPAWNING;
         suddenNightDelaySeconds = DEFAULT_SUDDEN_NIGHT_DELAY_SECONDS;
         shrinkingZoneEnabled = DEFAULT_SHRINKING_ZONE_ENABLED;
+        randomEventsEnabled = DEFAULT_RANDOM_EVENTS_ENABLED;
         shrinkingZoneStartDelaySeconds = DEFAULT_SHRINKING_ZONE_START_DELAY_SECONDS;
         shrinkingZoneDurationSeconds = DEFAULT_SHRINKING_ZONE_DURATION_SECONDS;
         shrinkingZoneMinSize = DEFAULT_SHRINKING_ZONE_MIN_SIZE;
@@ -2640,6 +2712,7 @@ public final class GameManager {
         setLobbyArenaSelection(DEFAULT_LOBBY_ARENA_ID);
         refreshSuddenNightSessions();
         refreshShrinkingZoneSessions();
+        refreshRandomEventSessions();
     }
 
     private void setLobbyArenaSelection(String selectedArenaId) {
@@ -2730,6 +2803,12 @@ public final class GameManager {
     private void refreshShrinkingZoneSessions() {
         for (Arena arena : arenas.values()) {
             arena.restartShrinkingZoneSession();
+        }
+    }
+
+    private void refreshRandomEventSessions() {
+        for (Arena arena : arenas.values()) {
+            arena.restartRandomEventsSession();
         }
     }
 

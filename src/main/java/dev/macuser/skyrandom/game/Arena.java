@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import dev.macuser.skyrandom.lang.PlayerLanguage;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -25,6 +26,8 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
@@ -40,6 +43,16 @@ public final class Arena {
     private static final String CLEANUP_ENTRY = ChatColor.GOLD.toString();
     private static final int DEFAULT_CLEANUP_BLOCKS_PER_TICK = 4096;
     private static final int SHRINKING_ZONE_TASK_PERIOD_TICKS = 20;
+    private static final int RANDOM_EVENT_TASK_PERIOD_TICKS = 20;
+    private static final int RANDOM_EVENT_MIN_DELAY_SECONDS = 45;
+    private static final int RANDOM_EVENT_MAX_DELAY_SECONDS = 75;
+    private static final int RANDOM_EVENT_FIRST_MIN_DELAY_SECONDS = 25;
+    private static final int RANDOM_EVENT_FIRST_MAX_DELAY_SECONDS = 40;
+    private static final int LOW_GRAVITY_DURATION_TICKS = 15 * 20;
+    private static final int LUCKY_DROPS_DURATION_TICKS = 10 * 20;
+    private static final int RESISTANCE_DURATION_TICKS = 15 * 20;
+    private static final int SUDDEN_HUNGER_DURATION_TICKS = 15 * 20;
+    private static final int SUDDEN_HUNGER_INTERVAL_TICKS = 20;
 
     private final GameManager manager;
     private final String id;
@@ -87,11 +100,16 @@ public final class Arena {
     private GameState state = GameState.WAITING;
     private BukkitTask countdownTask;
     private BukkitTask dropTask;
+    private BukkitTask randomEventTask;
+    private BukkitTask activeRandomEventTask;
+    private BukkitTask activeRandomEventEndTask;
     private BukkitTask shrinkingZoneTask;
     private BukkitTask finishTask;
     private BukkitTask cleanupTask;
     private int countdownRemaining;
     private int ticksUntilNextDrop;
+    private int ticksUntilNextRandomEvent;
+    private int luckyDropsRemainingTicks;
     private int intermissionRemaining;
     private int intermissionDurationSeconds;
     private int currentRound;
@@ -107,6 +125,7 @@ public final class Arena {
     private int lastShrinkingZoneCountdownSeconds = -1;
     private int lastShrinkingZoneSecondCountdownSeconds = -1;
     private final Set<UUID> playersOutsideShrinkingZone = new LinkedHashSet<>();
+    private final Map<UUID, FoodState> randomEventFoodStates = new HashMap<>();
 
     public Arena(
         GameManager manager,
@@ -248,6 +267,14 @@ public final class Arena {
         stopShrinkingZoneSession(true);
         startShrinkingZoneIfNeeded();
         updateRunningBar();
+    }
+
+    public void restartRandomEventsSession() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        stopRandomEventsSession(true);
+        startRandomEventsIfNeeded();
     }
 
     public void reevaluateCountdownState() {
@@ -803,6 +830,7 @@ public final class Arena {
         }
         startShrinkingZoneIfNeeded();
         startDrops();
+        startRandomEventsIfNeeded();
     }
 
     private void startDrops() {
@@ -833,9 +861,17 @@ public final class Arena {
                         if (player == null || !player.isOnline()) {
                             continue;
                         }
-                        manager.getDropTable().roll(player, this);
+                        if (luckyDropsRemainingTicks > 0 && manager.getDropTable().hasRareDrops()) {
+                            manager.getDropTable().rollRare(player, this);
+                        } else {
+                            manager.getDropTable().roll(player, this);
+                        }
                     }
                     ticksUntilNextDrop = dropIntervalTicks;
+                }
+
+                if (luckyDropsRemainingTicks > 0) {
+                    luckyDropsRemainingTicks = Math.max(0, luckyDropsRemainingTicks - 1);
                 }
 
                 updateRunningBar();
@@ -843,6 +879,158 @@ public final class Arena {
             1L,
             1L
         );
+    }
+
+    private void startRandomEventsIfNeeded() {
+        if (!manager.isRandomEventsEnabled() || randomEventTask != null) {
+            return;
+        }
+
+        ticksUntilNextRandomEvent = randomEventDelayTicks(RANDOM_EVENT_FIRST_MIN_DELAY_SECONDS, RANDOM_EVENT_FIRST_MAX_DELAY_SECONDS);
+        randomEventTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
+            manager.getPlugin(),
+            () -> {
+                if (state != GameState.RUNNING) {
+                    stopRandomEventsSession(true);
+                    return;
+                }
+
+                ticksUntilNextRandomEvent -= RANDOM_EVENT_TASK_PERIOD_TICKS;
+                if (ticksUntilNextRandomEvent <= 0) {
+                    triggerRandomEvent();
+                    ticksUntilNextRandomEvent = randomEventDelayTicks(RANDOM_EVENT_MIN_DELAY_SECONDS, RANDOM_EVENT_MAX_DELAY_SECONDS);
+                }
+            },
+            RANDOM_EVENT_TASK_PERIOD_TICKS,
+            RANDOM_EVENT_TASK_PERIOD_TICKS
+        );
+    }
+
+    private void triggerRandomEvent() {
+        RandomRoundEvent event = RandomRoundEvent.random();
+        announceRandomEvent(event);
+
+        switch (event) {
+            case LOW_GRAVITY -> applyLowGravityEvent();
+            case LUCKY_DROPS -> startLuckyDropsEvent();
+            case RESISTANCE -> applyResistanceEvent();
+            case SUDDEN_HUNGER -> startSuddenHungerEvent();
+        }
+    }
+
+    private void announceRandomEvent(RandomRoundEvent event) {
+        playArenaSound(Sound.BLOCK_NOTE_BLOCK_CHIME, 0.9F, 1.25F);
+        for (UUID uuid : List.copyOf(activePlayers)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            player.sendTitle(
+                manager.tr(player, "arena.random_event_title", "event", manager.tr(player, event.nameKey())),
+                manager.tr(player, event.subtitleKey()),
+                5,
+                45,
+                10
+            );
+            sendLocalized(player, "arena.random_event_started", "event", manager.tr(player, event.nameKey()));
+        }
+    }
+
+    private void applyLowGravityEvent() {
+        forEachActivePlayer(player -> {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, LOW_GRAVITY_DURATION_TICKS, 0, true, true, true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, LOW_GRAVITY_DURATION_TICKS, 1, true, true, true));
+        });
+    }
+
+    private void startLuckyDropsEvent() {
+        luckyDropsRemainingTicks = LUCKY_DROPS_DURATION_TICKS;
+    }
+
+    private void applyResistanceEvent() {
+        forEachActivePlayer(player ->
+            player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, RESISTANCE_DURATION_TICKS, 0, true, true, true))
+        );
+    }
+
+    private void startSuddenHungerEvent() {
+        cancelActiveRandomEventTask();
+        randomEventFoodStates.clear();
+        forEachActivePlayer(player -> randomEventFoodStates.put(player.getUniqueId(), FoodState.of(player)));
+
+        activeRandomEventTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
+            manager.getPlugin(),
+            () -> {
+                if (state != GameState.RUNNING) {
+                    restoreRandomEventFoodStates();
+                    cancelActiveRandomEventTask();
+                    return;
+                }
+
+                forEachActivePlayer(player -> player.setFoodLevel(Math.max(0, player.getFoodLevel() - 1)));
+            },
+            SUDDEN_HUNGER_INTERVAL_TICKS,
+            SUDDEN_HUNGER_INTERVAL_TICKS
+        );
+        activeRandomEventEndTask = manager.getPlugin().getServer().getScheduler().runTaskLater(
+            manager.getPlugin(),
+            () -> {
+                restoreRandomEventFoodStates();
+                cancelActiveRandomEventTask();
+            },
+            SUDDEN_HUNGER_DURATION_TICKS
+        );
+    }
+
+    private void stopRandomEventsSession(boolean restoreFood) {
+        if (randomEventTask != null) {
+            randomEventTask.cancel();
+            randomEventTask = null;
+        }
+        cancelActiveRandomEventTask();
+        luckyDropsRemainingTicks = 0;
+        ticksUntilNextRandomEvent = 0;
+        if (restoreFood) {
+            restoreRandomEventFoodStates();
+        } else {
+            randomEventFoodStates.clear();
+        }
+    }
+
+    private void cancelActiveRandomEventTask() {
+        if (activeRandomEventTask != null) {
+            activeRandomEventTask.cancel();
+            activeRandomEventTask = null;
+        }
+        if (activeRandomEventEndTask != null) {
+            activeRandomEventEndTask.cancel();
+            activeRandomEventEndTask = null;
+        }
+    }
+
+    private void restoreRandomEventFoodStates() {
+        for (Map.Entry<UUID, FoodState> entry : randomEventFoodStates.entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player != null && player.isOnline()) {
+                entry.getValue().restore(player);
+            }
+        }
+        randomEventFoodStates.clear();
+    }
+
+    private void forEachActivePlayer(java.util.function.Consumer<Player> action) {
+        for (UUID uuid : List.copyOf(activePlayers)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                action.accept(player);
+            }
+        }
+    }
+
+    private static int randomEventDelayTicks(int minSeconds, int maxSeconds) {
+        int min = Math.max(1, minSeconds);
+        int max = Math.max(min, maxSeconds);
+        return ThreadLocalRandom.current().nextInt(min, max + 1) * 20;
     }
 
     private void checkForWinner() {
@@ -864,6 +1052,7 @@ public final class Arena {
             dropTask.cancel();
             dropTask = null;
         }
+        stopRandomEventsSession(true);
         endSuddenNightSessionIfNeeded();
         stopShrinkingZoneSession(true);
         updateBarsAppearance(BarColor.PURPLE, 1.0D, null, false);
@@ -928,6 +1117,7 @@ public final class Arena {
     private void finishRound() {
         endSuddenNightSessionIfNeeded();
         stopShrinkingZoneSession(true);
+        stopRandomEventsSession(true);
         boolean reachedResetRound = currentRound >= roundsBeforeReset;
         if (reachedResetRound) {
             startArenaRegionCleanup(() -> completeRound(true));
@@ -955,6 +1145,7 @@ public final class Arena {
         roundStartedAtMillis = 0L;
         currentRoundParticipants.clear();
         resetShrinkingZoneState();
+        stopRandomEventsSession(true);
 
         if (reachedResetRound) {
             manager.rotateRandomQueuePlayers(this);
@@ -988,6 +1179,7 @@ public final class Arena {
         cancelAllTasks();
         endSuddenNightSessionIfNeeded();
         stopShrinkingZoneSession(false);
+        stopRandomEventsSession(false);
         if (cleanupBlocks) {
             restoreArenaRegion();
         }
@@ -1035,6 +1227,18 @@ public final class Arena {
         if (dropTask != null) {
             dropTask.cancel();
             dropTask = null;
+        }
+        if (randomEventTask != null) {
+            randomEventTask.cancel();
+            randomEventTask = null;
+        }
+        if (activeRandomEventTask != null) {
+            activeRandomEventTask.cancel();
+            activeRandomEventTask = null;
+        }
+        if (activeRandomEventEndTask != null) {
+            activeRandomEventEndTask.cancel();
+            activeRandomEventEndTask = null;
         }
         if (shrinkingZoneTask != null) {
             shrinkingZoneTask.cancel();
@@ -1766,6 +1970,47 @@ public final class Arena {
     private record BlockKey(int x, int y, int z) {
         private static BlockKey of(Block block) {
             return new BlockKey(block.getX(), block.getY(), block.getZ());
+        }
+    }
+
+    private record FoodState(int foodLevel, float saturation, float exhaustion) {
+        private static FoodState of(Player player) {
+            return new FoodState(player.getFoodLevel(), player.getSaturation(), player.getExhaustion());
+        }
+
+        private void restore(Player player) {
+            player.setFoodLevel(foodLevel);
+            player.setSaturation(saturation);
+            player.setExhaustion(exhaustion);
+        }
+    }
+
+    private enum RandomRoundEvent {
+        LOW_GRAVITY("arena.random_event_low_gravity", "arena.random_event_low_gravity_subtitle"),
+        LUCKY_DROPS("arena.random_event_lucky_drops", "arena.random_event_lucky_drops_subtitle"),
+        RESISTANCE("arena.random_event_resistance", "arena.random_event_resistance_subtitle"),
+        SUDDEN_HUNGER("arena.random_event_sudden_hunger", "arena.random_event_sudden_hunger_subtitle");
+
+        private static final RandomRoundEvent[] VALUES = values();
+
+        private final String nameKey;
+        private final String subtitleKey;
+
+        RandomRoundEvent(String nameKey, String subtitleKey) {
+            this.nameKey = nameKey;
+            this.subtitleKey = subtitleKey;
+        }
+
+        private String nameKey() {
+            return nameKey;
+        }
+
+        private String subtitleKey() {
+            return subtitleKey;
+        }
+
+        private static RandomRoundEvent random() {
+            return VALUES[ThreadLocalRandom.current().nextInt(VALUES.length)];
         }
     }
 

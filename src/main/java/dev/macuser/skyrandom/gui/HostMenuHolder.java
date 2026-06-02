@@ -10,7 +10,8 @@ public final class HostMenuHolder implements InventoryHolder {
         SUDDEN_NIGHT,
         GAME_SPEED,
         MAP_SELECTION,
-        SHRINKING_ZONE
+        SHRINKING_ZONE,
+        RANDOM_EVENTS
     }
 
     private final Section section;
