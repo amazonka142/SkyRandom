@@ -7,8 +7,8 @@ plugins {
     java
 }
 
-val paperApiVersion = providers.gradleProperty("paperApiVersion").orElse("1.21.11-R0.1-SNAPSHOT")
-val javaRelease = providers.gradleProperty("javaRelease").map(String::toInt).orElse(21)
+val paperApiVersion = providers.gradleProperty("paperApiVersion").orElse("26.2.build.19-alpha")
+val javaRelease = providers.gradleProperty("javaRelease").map(String::toInt).orElse(25)
 val versionPropertiesFile = layout.projectDirectory.file("version.properties").asFile
 val versionProperties = Properties().apply {
     versionPropertiesFile.inputStream().use(::load)
@@ -44,8 +44,8 @@ repositories {
 }
 
 dependencies {
-    // Compile against the oldest supported Paper API so one jar can run on both
-    // Paper 1.21.11 and newer compatible server versions such as 26.1.1 and 26.1.2.
+    // SkyRandom 1.2.0-beta.2 targets Paper-compatible 26.2 servers.
+    // Older Paper/Purpur 1.21.11 and 26.1.x builds are intentionally not supported.
     compileOnly("io.papermc.paper:paper-api:${paperApiVersion.get()}")
 }
 

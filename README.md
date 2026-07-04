@@ -12,7 +12,7 @@ Version 1.1.0 adds the Frozen Peaks, Crystal Cavern, and Trial Chamber arenas, F
 
 Latest stable: `1.1.0`
 
-Latest beta: `1.2.0-beta.1 (soon)`
+Latest beta: `1.2.0-beta.2 (soon)`
 
 ## How Matches Work
 
@@ -26,7 +26,7 @@ SkyRandom is a server plugin, not a mod, so it cannot be used in singleplayer.
 
 ## Installation
 
-To use SkyRandom, you must install it on a Paper server:
+To use SkyRandom, you must install it on a Paper-compatible server:
 
 1. Download the `.jar` file.
 2. Place it into your server's `plugins` folder.
@@ -35,19 +35,19 @@ To use SkyRandom, you must install it on a Paper server:
 ## Supported Server Software
 
 - Paper
+- Purpur
 
-## Supported Minecraft / Paper Versions
+## Supported Minecraft / Server Versions
 
-- Paper 1.21.11
-- Paper 26.1.1
-- Paper 26.1.2
+- Paper 26.2
+- Purpur 26.2
 
-Paper 1.21.11 was smoke-tested on Java 21.
-
-Paper 26.1.1 and 26.1.2 were smoke-tested on Java 25.
+Paper 26.2 build 19 and Purpur 26.2 build 2593 were smoke-tested on Java 25 with Paper API `26.2.build.19-alpha`.
+Paper/Purpur 26.2 require Java 25 and are currently on experimental build lines.
+Older Paper/Purpur 1.21.11 and 26.1.x servers are no longer supported by the beta.2 line.
 
 ## Release Status
 
 SkyRandom 1.1.0 is the latest stable public release and is designed for small Paper servers and quick PvP matches.
 
-SkyRandom 1.2.0-beta.1 is the current beta line for testing the next feature update.
+SkyRandom 1.2.0-beta.2 is the current beta line for testing the next feature update on Paper/Purpur 26.2.

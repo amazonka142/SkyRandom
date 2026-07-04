@@ -22,9 +22,12 @@ import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.SulfurCube;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -184,6 +187,7 @@ public final class DropTable {
             case "random_block" -> parseRandomBlock(section, weight, logger);
             case "effect" -> parseEffect(section, weight, logger);
             case "mob" -> parseMob(section, weight, logger);
+            case "sulfur_tnt_cube" -> parseSulfurTntCube(section, weight);
             default -> {
                 logger.warning("Unknown drop type '" + type + "'.");
                 yield null;
@@ -290,6 +294,12 @@ public final class DropTable {
 
         AmountRange amount = AmountRange.parse(section.get("amount"));
         return new MobDrop(weight, entityType, amount);
+    }
+
+    private static DropAction parseSulfurTntCube(ConfigurationSection section, double weight) {
+        AmountRange amount = AmountRange.parse(section.get("amount"));
+        int fuseSeconds = Math.max(1, section.getInt("fuse-seconds", 6));
+        return new SulfurTntCubeDrop(weight, amount, fuseSeconds * 20);
     }
 
     private static DropGroup pickWeighted(List<DropGroup> groups, double totalWeight) {
@@ -489,7 +499,7 @@ public final class DropTable {
             return;
         }
 
-        List<RandomEnchantOption> options = randomEnchantOptions(material);
+        List<RandomEnchantOption> options = new ArrayList<>(randomEnchantOptions(material));
         if (options.isEmpty()) {
             return;
         }
@@ -647,6 +657,64 @@ public final class DropTable {
             }
             arena.sendLocalized(player, "drop.mob_spawned", "mob", prettify(entityType.name()), "amount", count);
         }
+    }
+
+    private record SulfurTntCubeDrop(double weight, AmountRange amount, int fuseTicks) implements DropAction {
+
+        @Override
+        public String key() {
+            return "sulfur_tnt_cube";
+        }
+
+        @Override
+        public void apply(Player player, Arena arena) {
+            int count = amount.roll();
+            for (int i = 0; i < count; i++) {
+                Location spawnLocation = arena.getMobSpawnLocation(player.getLocation());
+                if (!(spawnLocation.getWorld().spawnEntity(spawnLocation, EntityType.SULFUR_CUBE) instanceof SulfurCube cube)) {
+                    continue;
+                }
+
+                cube.setSize(2);
+                cube.setAdult();
+                cube.setAgeLock(true);
+                cube.setWander(false);
+                cube.getEquipment().setItem(EquipmentSlot.BODY, new ItemStack(Material.TNT), false);
+                cube.getEquipment().setDropChance(EquipmentSlot.BODY, 0.0F);
+                primeSulfurTntCube(cube, fuseTicks);
+            }
+            arena.sendLocalized(player, "drop.sulfur_tnt_cube_spawned", "amount", count);
+        }
+    }
+
+    private static void primeSulfurTntCube(SulfurCube cube, int fuseTicks) {
+        if (tryPrimeSulfurTntCube(cube, fuseTicks)) {
+            return;
+        }
+
+        JavaPlugin plugin = JavaPlugin.getProvidingPlugin(DropTable.class);
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (cube.isValid() && !cube.isDead()) {
+                cube.getEquipment().setItem(EquipmentSlot.BODY, new ItemStack(Material.TNT), false);
+                cube.getEquipment().setDropChance(EquipmentSlot.BODY, 0.0F);
+                tryPrimeSulfurTntCube(cube, fuseTicks);
+            }
+        }, 1L);
+    }
+
+    private static boolean tryPrimeSulfurTntCube(SulfurCube cube, int fuseTicks) {
+        if (!cube.isValid() || cube.isDead()) {
+            return true;
+        }
+        if (!cube.canExplode()) {
+            return false;
+        }
+
+        boolean ignited = cube.ignite(false);
+        if (ignited && fuseTicks > 0) {
+            cube.setFuseTicks(fuseTicks);
+        }
+        return ignited || cube.getFuseTicks() > 0;
     }
 
     private record AmountRange(int min, int max) {

@@ -53,6 +53,8 @@ public final class Arena {
     private static final int RESISTANCE_DURATION_TICKS = 15 * 20;
     private static final int SUDDEN_HUNGER_DURATION_TICKS = 15 * 20;
     private static final int SUDDEN_HUNGER_INTERVAL_TICKS = 20;
+    private static final int FIRE_FEET_DURATION_TICKS = 15 * 20;
+    private static final int FIRE_FEET_INTERVAL_TICKS = 10;
 
     private final GameManager manager;
     private final String id;
@@ -915,6 +917,7 @@ public final class Arena {
             case LUCKY_DROPS -> startLuckyDropsEvent();
             case RESISTANCE -> applyResistanceEvent();
             case SUDDEN_HUNGER -> startSuddenHungerEvent();
+            case FIRE_FEET -> startFireFeetEvent();
         }
     }
 
@@ -980,6 +983,44 @@ public final class Arena {
             },
             SUDDEN_HUNGER_DURATION_TICKS
         );
+    }
+
+    private void startFireFeetEvent() {
+        cancelActiveRandomEventTask();
+
+        activeRandomEventTask = manager.getPlugin().getServer().getScheduler().runTaskTimer(
+            manager.getPlugin(),
+            () -> {
+                if (state != GameState.RUNNING) {
+                    cancelActiveRandomEventTask();
+                    return;
+                }
+
+                forEachActivePlayer(this::igniteBlockUnderPlayer);
+            },
+            0L,
+            FIRE_FEET_INTERVAL_TICKS
+        );
+        activeRandomEventEndTask = manager.getPlugin().getServer().getScheduler().runTaskLater(
+            manager.getPlugin(),
+            this::cancelActiveRandomEventTask,
+            FIRE_FEET_DURATION_TICKS
+        );
+    }
+
+    private void igniteBlockUnderPlayer(Player player) {
+        Location location = player.getLocation();
+        if (!contains(location)) {
+            return;
+        }
+
+        Block fireBlock = location.getBlock();
+        Block supportBlock = fireBlock.getRelative(org.bukkit.block.BlockFace.DOWN);
+        if (!fireBlock.getType().isAir() || supportBlock.getType().isAir()) {
+            return;
+        }
+
+        fireBlock.setType(Material.FIRE, false);
     }
 
     private void stopRandomEventsSession(boolean restoreFood) {
@@ -1989,7 +2030,8 @@ public final class Arena {
         LOW_GRAVITY("arena.random_event_low_gravity", "arena.random_event_low_gravity_subtitle"),
         LUCKY_DROPS("arena.random_event_lucky_drops", "arena.random_event_lucky_drops_subtitle"),
         RESISTANCE("arena.random_event_resistance", "arena.random_event_resistance_subtitle"),
-        SUDDEN_HUNGER("arena.random_event_sudden_hunger", "arena.random_event_sudden_hunger_subtitle");
+        SUDDEN_HUNGER("arena.random_event_sudden_hunger", "arena.random_event_sudden_hunger_subtitle"),
+        FIRE_FEET("arena.random_event_fire_feet", "arena.random_event_fire_feet_subtitle");
 
         private static final RandomRoundEvent[] VALUES = values();
 

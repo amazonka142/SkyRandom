@@ -251,7 +251,7 @@ host:
   random_events_toggle_lore:
     - "&7Status: {status}"
     - "&7Low Gravity, Lucky Drops,"
-    - "&7Resistance, and hunger."
+    - "&7Resistance, hunger, and fire."
     - "{action}"
   random_events_changed: "Random Events: {status}"
   speed_menu_title: "&6Game Speed"
@@ -365,6 +365,8 @@ arena:
   random_event_resistance_subtitle: "&7Everyone gets Resistance I for 15 sec."
   random_event_sudden_hunger: "Sudden Hunger"
   random_event_sudden_hunger_subtitle: "&7Hunger drains for 15 sec., then restores."
+  random_event_fire_feet: "Fire Feet"
+  random_event_fire_feet_subtitle: "&7Fire appears under players for 15 sec. Run!"
   shrinking_zone_countdown: "&cShrinking Zone starts in &f{seconds} &csec."
   shrinking_zone_started: "&cShrinking Zone is closing. &7Stay near the arena center."
   shrinking_zone_second_countdown: "&cFinal zone starts shrinking in &f{seconds} &csec."
@@ -412,3 +414,4 @@ drop:
   effect: "You got the effect: &f{effect} &7({seconds}s, lvl {level})"
   spawn_egg: "You received a spawn egg: &f{mob} &7x{amount}"
   mob_spawned: "A mob appeared near you: &f{mob} &7x{amount}"
+  sulfur_tnt_cube_spawned: "&cA primed TNT Sulfur Cube appeared near you! &7x{amount}"

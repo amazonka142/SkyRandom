@@ -443,6 +443,14 @@ loot-table:
         entity: CHICKEN
         amount: 1-2
 
+  explosive_sulfur_cube:
+    chance: 1
+    entries:
+      - type: sulfur_tnt_cube
+        weight: 1
+        amount: 1
+        fuse-seconds: 6
+
   chaos:
     chance: 18
     entries:

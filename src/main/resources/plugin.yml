@@ -1,7 +1,7 @@
 name: SkyRandom
 version: ${version}
 main: dev.macuser.skyrandom.SkyRandomPlugin
-api-version: '1.21.11'
+api-version: '26.2'
 author: amazonka142 (vkkooz)
 description: Round-based sky-islands mini-game with random arenas, auto loot drops, spectator mode, and arena rebuilds.
 commands:
